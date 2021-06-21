@@ -35,7 +35,9 @@ import java.util.concurrent.Future;
 
 import static com.aws.greengrass.deployment.DeploymentConfigMerger.DEPLOYMENT_ID_LOG_KEY;
 import static com.aws.greengrass.deployment.DeploymentService.GROUP_TO_ROOT_COMPONENTS_VERSION_KEY;
+import static com.aws.greengrass.deployment.converter.DeploymentDocumentConverter.LOCAL_DEPLOYMENT_GROUP_NAME;
 import static com.aws.greengrass.lifecyclemanager.Kernel.LARGE_CONFIGURATION;
+
 
 /**
  * A task of deploying a configuration specified by a deployment document to a Greengrass device.
@@ -186,6 +188,7 @@ public class DefaultDeploymentTask implements DeploymentTask {
             // skip root packages if device does not belong to that group anymore
             if (!groupTopics.getName().equals(deploymentDocument.getGroupName())
                     && (groupTopics.getName().startsWith(DEVICE_DEPLOYMENT_GROUP_NAME_PREFIX)
+                    || groupTopics.getName().equals(LOCAL_DEPLOYMENT_GROUP_NAME)
                     || groupsDeviceBelongsToOptional.isPresent() && groupsDeviceBelongsToOptional.get()
                     .contains(groupTopics.getName()))) {
                 groupTopics.forEach(pkgNode -> {
