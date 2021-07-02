@@ -179,10 +179,22 @@ public class KernelAlternatives {
             }
             return;
         }
+
+        relinkInitLaunchDir(unpackDir);
+    }
+
+    /**
+     * Unconditionally relink alts/init to the provided path and alts/current to alts/init.
+     *
+     * @param pathToNucleusDistro path to the unzipped Nucleus distribution
+     * @throws IOException on I/O error
+     */
+    public void relinkInitLaunchDir(Path pathToNucleusDistro) throws IOException {
+        Path initialLaunchDir = altsDir.resolve(INITIAL_SETUP_DIR);
         cleanupLaunchDirectorySingleLevel(initialLaunchDir.toFile());
         Utils.createPaths(initialLaunchDir);
 
-        setupLinkToDirectory(initialLaunchDir.resolve(KERNEL_DISTRIBUTION_DIR), unpackDir);
+        setupLinkToDirectory(initialLaunchDir.resolve(KERNEL_DISTRIBUTION_DIR), pathToNucleusDistro);
         Files.deleteIfExists(currentDir);
         setupLinkToDirectory(currentDir, initialLaunchDir);
 

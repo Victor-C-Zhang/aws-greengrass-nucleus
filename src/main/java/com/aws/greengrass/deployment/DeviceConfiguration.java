@@ -324,8 +324,9 @@ public class DeviceConfiguration {
         kernel.getConfig().lookup(SETENV_CONFIG_NAMESPACE, GGC_VERSION_ENV).dflt(nucleusComponentVersion);
     }
 
-    void initializeComponentStore(String nucleusComponentName, Semver componentVersion, Path recipePath,
-                                          Path unpackDir) throws IOException, PackageLoadingException {
+    void initializeComponentStore(KernelAlternatives kernelAlts, String nucleusComponentName,
+                                  Semver componentVersion, Path recipePath,
+                                  Path unpackDir) throws IOException, PackageLoadingException {
         // Copy recipe to component store
         ComponentStore componentStore = kernel.getContext().get(ComponentStore.class);
         ComponentIdentifier componentIdentifier = new ComponentIdentifier(nucleusComponentName, componentVersion);
@@ -345,6 +346,9 @@ public class DeviceConfiguration {
         Permissions.setArtifactPermission(destinationArtifactPath, FileSystemPermission.builder()
                 .ownerRead(true).ownerExecute(true).groupRead(true).groupExecute(true)
                 .otherRead(true).otherExecute(true).build());
+        // Relink the alts path to point to the artifact since we've just installed. This will allow the customer to
+        // delete their unzipped Nucleus distribution.
+        kernelAlts.relinkInitLaunchDir(destinationArtifactPath);
     }
 
     /**
@@ -375,7 +379,7 @@ public class DeviceConfiguration {
             componentVersion = componentRecipe.getVersion();
             initializeNucleusLifecycleConfig(nucleusComponentName, componentRecipe);
 
-            initializeComponentStore(nucleusComponentName, componentVersion, recipePath, unpackDir);
+            initializeComponentStore(kernelAlts, nucleusComponentName, componentVersion, recipePath, unpackDir);
 
         } catch (IOException | URISyntaxException | PackageLoadingException e) {
             logger.atError().log("Unable to set up Nucleus from build recipe file", e);
