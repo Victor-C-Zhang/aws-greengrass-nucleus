@@ -113,39 +113,43 @@ public class TemplateEngine {
      * @throws IllegalTemplateDependencyException   if a template declares a dependency on another template.
      * @throws IOException                          if something funky happens with I/O or de/serialization.
      */
-    @SuppressWarnings({"PMD.CognitiveComplexity", "PMD.AvoidDeeplyNestedIfStmts", "PMD.AvoidDuplicateLiterals"})
     void loadComponents() throws TemplateExecutionException, IOException {
         try (Stream<Path> files = Files.walk(recipeDirectoryPath)) {
             for (Path r : files.collect(Collectors.toList())) {
                 if (!r.toFile().isDirectory()) {
-                    ComponentRecipe recipe = parseFile(r);
-                    ComponentIdentifier identifier = new ComponentIdentifier(recipe.getComponentName(),
-                            recipe.getComponentVersion());
-                    recipes.put(identifier, recipe);
-                    if (recipe.getComponentName().endsWith("Template")) { // TODO: same as above
-                        templates.put(recipe.getComponentName(), identifier);
-                    }
-                    Map<String, DependencyProperties> deps = recipe.getComponentDependencies();
-                    if (deps == null) {
-                        continue;
-                    }
-                    boolean paramFileAlreadyHasDependency = false;
-                    for (Map.Entry<String, DependencyProperties> me : deps.entrySet()) {
-                        if (me.getKey().endsWith("Template")) { // TODO: same as above
-                            if (identifier.getName().endsWith("Template")) { // TODO: here too
-                                throw new IllegalTemplateDependencyException("Illegal dependency for template "
-                                        + identifier.getName() + ". Templates cannot depend on other templates");
-                            }
-                            if (paramFileAlreadyHasDependency) {
-                                throw new MultipleTemplateDependencyException("Parameter file " + identifier.getName()
-                                        + " has multiple template dependencies");
-                            }
-                            paramFileAlreadyHasDependency = true;
-                            needsToBeBuilt.putIfAbsent(me.getKey(), new ArrayList<>());
-                            needsToBeBuilt.get(me.getKey()).add(identifier);
-                        }
-                    }
+                    loadComponent(r);
                 }
+            }
+        }
+    }
+
+    @SuppressWarnings("PMD.AvoidDuplicateLiterals")
+    void loadComponent(Path recipePath) throws TemplateExecutionException, IOException {
+        ComponentRecipe recipe = parseFile(recipePath);
+        ComponentIdentifier identifier = new ComponentIdentifier(recipe.getComponentName(),
+                recipe.getComponentVersion());
+        recipes.put(identifier, recipe);
+        if (recipe.getComponentName().endsWith("Template")) { // TODO: same as above
+            templates.put(recipe.getComponentName(), identifier);
+        }
+        Map<String, DependencyProperties> deps = recipe.getComponentDependencies();
+        if (deps == null) {
+            return;
+        }
+        boolean paramFileAlreadyHasDependency = false;
+        for (Map.Entry<String, DependencyProperties> me : deps.entrySet()) {
+            if (me.getKey().endsWith("Template")) { // TODO: same as above
+                if (identifier.getName().endsWith("Template")) { // TODO: here too
+                    throw new IllegalTemplateDependencyException("Illegal dependency for template "
+                            + identifier.getName() + ". Templates cannot depend on other templates");
+                }
+                if (paramFileAlreadyHasDependency) {
+                    throw new MultipleTemplateDependencyException("Parameter file " + identifier.getName()
+                            + " has multiple template dependencies");
+                }
+                paramFileAlreadyHasDependency = true;
+                needsToBeBuilt.putIfAbsent(me.getKey(), new ArrayList<>());
+                needsToBeBuilt.get(me.getKey()).add(identifier);
             }
         }
     }

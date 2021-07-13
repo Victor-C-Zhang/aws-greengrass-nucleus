@@ -96,7 +96,7 @@ public abstract class RecipeTransformer {
      * @param defaultConfig the DefaultConfiguration recipe key.
      * @throws TemplateParameterException if the template recipe file or given configuration is malformed.
      */
-    @SuppressWarnings({"PMD.ForLoopCanBeForeach", "PMD.AvoidDuplicateLiterals"})
+    @SuppressWarnings("PMD.ForLoopCanBeForeach")
     protected void templateConfig(JsonNode defaultConfig) throws
             TemplateParameterException {
         // validate schema in template matches internal schema, just for good measure

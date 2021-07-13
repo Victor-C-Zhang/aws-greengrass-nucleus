@@ -38,6 +38,7 @@ public class TransformerWrapper {
      * @throws IllegalAccessException       similarly.
      * @throws RecipeTransformerException   for everything else.
      */
+    @SuppressWarnings("PMD.CloseResource")
     public TransformerWrapper(Path pathToExecutable, String className, ComponentRecipe template)
             throws ClassNotFoundException, IllegalTransformerException, NoSuchMethodException,
             InvocationTargetException, InstantiationException, IllegalAccessException, RecipeTransformerException {
