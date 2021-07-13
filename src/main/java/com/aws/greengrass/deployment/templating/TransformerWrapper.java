@@ -17,6 +17,9 @@ import java.net.MalformedURLException;
 import java.net.URL;
 import java.net.URLClassLoader;
 import java.nio.file.Path;
+import java.security.AccessController;
+import java.security.PrivilegedActionException;
+import java.security.PrivilegedExceptionAction;
 import java.util.List;
 import javax.inject.Inject;
 
@@ -46,9 +49,12 @@ public class TransformerWrapper {
             throw new RecipeTransformerException("Could not find template parsing jar to execute");
         }
         try {
-            URLClassLoader loader = new URLClassLoader(new URL[] {pathToExecutable.toFile().toURI().toURL()},
-                    TransformerWrapper.class.getClassLoader());
-
+            URLClassLoader loader = AccessController.doPrivileged(new PrivilegedExceptionAction<URLClassLoader>() {
+                public URLClassLoader run() throws MalformedURLException {
+                    return new URLClassLoader(new URL[] {pathToExecutable.toFile().toURI().toURL()},
+                            TransformerWrapper.class.getClassLoader());
+                }
+            });
             Class<?> recipeTransformerClass = Class.forName(className, true, loader);
             if (!RecipeTransformer.class.isAssignableFrom(recipeTransformerClass)) {
                 throw new IllegalTransformerException(className + " does not implement the RecipeTransformer "
@@ -58,7 +64,7 @@ public class TransformerWrapper {
                     .getConstructor(ComponentRecipe.class)
                     .newInstance(template);
             loader.close();
-        } catch (MalformedURLException e) {
+        } catch (PrivilegedActionException | MalformedURLException e) {
             throw new RecipeTransformerException("Could not find template parsing jar to execute", e);
         } catch (IOException e) {
             logger.atWarn().setCause(e).log("Could not close URLClassLoader for template "
