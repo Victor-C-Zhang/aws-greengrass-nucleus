@@ -50,6 +50,7 @@ public class TransformerWrapper {
         }
         try {
             URLClassLoader loader = AccessController.doPrivileged(new PrivilegedExceptionAction<URLClassLoader>() {
+                @Override
                 public URLClassLoader run() throws MalformedURLException {
                     return new URLClassLoader(new URL[] {pathToExecutable.toFile().toURI().toURL()},
                             TransformerWrapper.class.getClassLoader());
