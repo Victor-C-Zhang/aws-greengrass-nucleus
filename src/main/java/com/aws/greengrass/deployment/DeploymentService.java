@@ -157,7 +157,7 @@ public class DeploymentService extends GreengrassService {
             ComponentManager componentManager, KernelConfigResolver kernelConfigResolver,
             DeploymentConfigMerger deploymentConfigMerger, DeploymentStatusKeeper deploymentStatusKeeper,
             DeploymentDirectoryManager deploymentDirectoryManager, Context context, Kernel kernel,
-            DeviceConfiguration deviceConfiguration, ThingGroupHelper thingGroupHelper) {
+            DeviceConfiguration deviceConfiguration, ThingGroupHelper thingGroupHelper, TemplateEngine templateEngine) {
         super(topics);
         this.executorService = executorService;
         this.dependencyResolver = dependencyResolver;
@@ -171,6 +171,7 @@ public class DeploymentService extends GreengrassService {
         this.deviceConfiguration = deviceConfiguration;
         this.pollingFrequency.set(getPollingFrequency(deviceConfiguration.getDeploymentPollingFrequencySeconds()));
         this.thingGroupHelper = thingGroupHelper;
+        this.templateEngine = templateEngine;
     }
 
     @Override
