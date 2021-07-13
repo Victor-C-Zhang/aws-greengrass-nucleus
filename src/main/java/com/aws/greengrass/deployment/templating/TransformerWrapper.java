@@ -6,8 +6,8 @@
 package com.aws.greengrass.deployment.templating;
 
 import com.amazon.aws.iot.greengrass.component.common.ComponentRecipe;
+import com.aws.greengrass.logging.api.Logger;
 import com.aws.greengrass.util.Pair;
-import com.fasterxml.jackson.databind.JsonNode;
 
 import java.io.IOException;
 import java.lang.reflect.InvocationTargetException;
@@ -16,9 +16,11 @@ import java.net.URL;
 import java.net.URLClassLoader;
 import java.nio.file.Path;
 import java.util.List;
+import javax.inject.Inject;
 
 public class TransformerWrapper {
-
+    @Inject
+    Logger logger;
     RecipeTransformer transformer;
 
     /**
@@ -38,28 +40,22 @@ public class TransformerWrapper {
         if (!pathToExecutable.toFile().exists()) {
             throw new RecipeTransformerException("Could not find template parsing jar to execute");
         }
-        System.out.println(pathToExecutable);
-        URLClassLoader loader;
         try {
-            loader = new URLClassLoader(new URL[] {pathToExecutable.toFile().toURI().toURL()},
+            URLClassLoader loader = new URLClassLoader(new URL[] {pathToExecutable.toFile().toURI().toURL()},
                     TransformerWrapper.class.getClassLoader());
+
+            Class<?> recipeTransformerClass = Class.forName(className, true, loader);
+            if (!RecipeTransformer.class.isAssignableFrom(recipeTransformerClass)) {
+                throw new IllegalTransformerException(className + " does not implement the RecipeTransformer interface");
+            }
+            transformer = (RecipeTransformer) recipeTransformerClass
+                    .getConstructor(ComponentRecipe.class)
+                    .newInstance(template);
+            loader.close();
         } catch (MalformedURLException e) {
             throw new RecipeTransformerException("Could not find template parsing jar to execute", e);
-        }
-        Class<?> recipeTransformerClass = Class.forName(className, true, loader);
-
-        if (!RecipeTransformer.class.isAssignableFrom(recipeTransformerClass)) {
-            throw new IllegalTransformerException(className + " does not implement the RecipeTransformer interface");
-        }
-
-        transformer = (RecipeTransformer) recipeTransformerClass
-                        .getConstructor(ComponentRecipe.class)
-                        .newInstance(template);
-
-        try {
-            loader.close();
         } catch (IOException e) {
-            e.printStackTrace();
+            logger.atWarn().setCause(e).log("Could not close URLClassLoader for template " + template.getComponentName());
         }
     }
 

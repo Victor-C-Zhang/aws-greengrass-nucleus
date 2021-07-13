@@ -27,6 +27,7 @@ public class EchoTransformer extends RecipeTransformer {
     private static final String COMPONENT_DESCRIPTION = "Component expanded with EchoTransformer";
     private static final String COMPONENT_PUBLISHER = "Me";
 
+    @SuppressWarnings("PMD.AvoidDuplicateLiterals")
     private static final String TEMPLATE_SCHEMA = "{\n" + "  \"param1\": {\n" + "    \"type\": \"string\",\n"
             + "    \"required\": true\n" + "  },\n" + "  \"param2\": {\n" + "    \"type\": \"string\",\n"
             + "    \"required\": true\n" + "  },\n" + "  \"resetParam1\": {\n" + "    \"type\": \"string\",\n"
