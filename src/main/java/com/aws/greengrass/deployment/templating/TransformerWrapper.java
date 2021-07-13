@@ -32,13 +32,15 @@ public class TransformerWrapper {
      * @param template          the template recipe file.
      * @throws ClassNotFoundException       if the jar does not contain the parser class.
      * @throws IllegalTransformerException  if the class does not implement the RecipeTransformer interface.
-     * @throws InstantiationException       if constructor is not public.
-     * @throws IllegalAccessException       idk...
+     * @throws NoSuchMethodException        similarly.
+     * @throws InvocationTargetException    if the called template throws an exception.
+     * @throws InstantiationException       if the constructor is not public.
+     * @throws IllegalAccessException       similarly.
      * @throws RecipeTransformerException   for everything else.
      */
     public TransformerWrapper(Path pathToExecutable, String className, ComponentRecipe template)
-            throws RecipeTransformerException, ClassNotFoundException, IllegalTransformerException,
-            NoSuchMethodException, InvocationTargetException, InstantiationException, IllegalAccessException {
+            throws ClassNotFoundException, IllegalTransformerException, NoSuchMethodException,
+            InvocationTargetException, InstantiationException, IllegalAccessException, RecipeTransformerException {
         if (!pathToExecutable.toFile().exists()) {
             throw new RecipeTransformerException("Could not find template parsing jar to execute");
         }
@@ -48,7 +50,8 @@ public class TransformerWrapper {
 
             Class<?> recipeTransformerClass = Class.forName(className, true, loader);
             if (!RecipeTransformer.class.isAssignableFrom(recipeTransformerClass)) {
-                throw new IllegalTransformerException(className + " does not implement the RecipeTransformer interface");
+                throw new IllegalTransformerException(className + " does not implement the RecipeTransformer "
+                        + "interface");
             }
             transformer = (RecipeTransformer) recipeTransformerClass
                     .getConstructor(ComponentRecipe.class)
@@ -57,7 +60,8 @@ public class TransformerWrapper {
         } catch (MalformedURLException e) {
             throw new RecipeTransformerException("Could not find template parsing jar to execute", e);
         } catch (IOException e) {
-            logger.atWarn().setCause(e).log("Could not close URLClassLoader for template " + template.getComponentName());
+            logger.atWarn().setCause(e).log("Could not close URLClassLoader for template "
+                    + template.getComponentName());
         }
     }
 
