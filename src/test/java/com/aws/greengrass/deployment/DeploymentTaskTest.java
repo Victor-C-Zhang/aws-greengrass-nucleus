@@ -117,8 +117,7 @@ class DeploymentTaskTest {
                 new DefaultDeploymentTask(mockDependencyResolver, mockComponentManager, mockKernelConfigResolver,
                         mockDeploymentConfigMerger, logger,
                         new Deployment(deploymentDocument, Deployment.DeploymentType.IOT_JOBS, "jobId", DEFAULT),
-                        mockDeploymentServiceConfig, mockExecutorService, deploymentDocumentDownloader,
-                        thingGroupHelper);
+                        mockDeploymentServiceConfig, mockExecutorService, deploymentDocumentDownloader, thingGroupHelper);
     }
 
     @Test
@@ -130,8 +129,8 @@ class DeploymentTaskTest {
         when(mockDeploymentConfigMerger.mergeInNewConfig(any(), any()))
                 .thenReturn(CompletableFuture.completedFuture(null));
         deploymentTask.call();
-        verify(mockComponentManager, times(2)).preparePackages(anyList());
-        verify(mockKernelConfigResolver, times(2)).resolve(anyList(), eq(deploymentDocument), anyList());
+        verify(mockComponentManager).preparePackages(anyList());
+        verify(mockKernelConfigResolver).resolve(anyList(), eq(deploymentDocument), anyList());
         verify(mockDeploymentConfigMerger).mergeInNewConfig(any(), any());
     }
 
@@ -252,8 +251,8 @@ class DeploymentTaskTest {
         assertTrue(mergeConfigInvoked.await(3, TimeUnit.SECONDS));
         t.interrupt();
 
-        verify(mockComponentManager, times(2)).preparePackages(anyList());
-        verify(mockKernelConfigResolver, times(2)).resolve(anyList(), eq(deploymentDocument), anyList());
+        verify(mockComponentManager).preparePackages(anyList());
+        verify(mockKernelConfigResolver).resolve(anyList(), eq(deploymentDocument), anyList());
         verify(mockDeploymentConfigMerger, timeout(4000)).mergeInNewConfig(any(), any());
         verify(mockMergeConfigFuture, timeout(5000)).cancel(false);
     }

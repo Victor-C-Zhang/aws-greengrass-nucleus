@@ -143,7 +143,6 @@ public class DefaultDeploymentTask implements DeploymentTask {
             if (Thread.currentThread().isInterrupted()) {
                 throw new InterruptedException("Deployment task is interrupted");
             }
-
             deploymentMergeFuture = deploymentConfigMerger.mergeInNewConfig(deployment, newConfig);
 
             // Block this without timeout because it can take a long time for the device to update the config
