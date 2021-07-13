@@ -45,8 +45,8 @@ import static com.amazon.aws.iot.greengrass.component.common.SerializerFactory.g
 public class TemplateEngine {
     public static final String PARSER_JAR = "transformer.jar";
 
-    private final Path recipeDirectoryPath;
-    private final Path artifactsDirectoryPath;
+    private Path recipeDirectoryPath;
+    private Path artifactsDirectoryPath;
     @Inject
     private ComponentStore componentStore;
     @Inject
@@ -56,25 +56,31 @@ public class TemplateEngine {
     private final Map<String, ComponentIdentifier> templates = new HashMap<>();
     private final Map<String, List<ComponentIdentifier>> needsToBeBuilt = new HashMap<>();
 
+    private boolean hasBeenInited; // init recipe/artifact paths after construction and injection
+
     /**
      * Constructor.
      */
     @Inject
     public TemplateEngine() {
-        recipeDirectoryPath = nucleusPaths.recipePath();
-        artifactsDirectoryPath = nucleusPaths.artifactPath();
     }
 
     /**
      * Constructor for testing only.
-     * @param recipeDirectoryPath       the directory in which to expand and clean up templates.
-     * @param artifactsDirectoryPath    the directory in which to prepare artifacts.
-     * @param componentStore            a ComponentStore instance.
+     * @param componentStore a ComponentStore instance.
      */
-    public TemplateEngine(Path recipeDirectoryPath, Path artifactsDirectoryPath, ComponentStore componentStore) {
+    public TemplateEngine(ComponentStore componentStore) {
+        this.componentStore = componentStore;
+    }
+
+    public void init() {
+        init(nucleusPaths.recipePath(), nucleusPaths.artifactPath());
+    }
+
+    public void init(Path recipeDirectoryPath, Path artifactsDirectoryPath) {
         this.recipeDirectoryPath = recipeDirectoryPath;
         this.artifactsDirectoryPath = artifactsDirectoryPath;
-        this.componentStore = componentStore;
+        hasBeenInited = true;
     }
 
     /**
@@ -86,6 +92,10 @@ public class TemplateEngine {
      */
     public void process() throws TemplateExecutionException, IOException,
             PackageLoadingException, RecipeTransformerException {
+        if (!hasBeenInited) {
+            throw new TemplateExecutionException("Template engine has not been initialized. This is a"
+                    + " problem for the developer not the user.");
+        }
         loadComponents();
         // TODO: resolve versioning, download dependencies if necessary
         expandAll();

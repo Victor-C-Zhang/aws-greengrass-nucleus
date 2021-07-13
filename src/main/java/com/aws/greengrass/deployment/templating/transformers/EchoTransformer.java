@@ -20,8 +20,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import static com.amazon.aws.iot.greengrass.component.common.SerializerFactory.getRecipeSerializer;
-
 public class EchoTransformer extends RecipeTransformer {
 
     private static final String COMPONENT_DESCRIPTION = "Component expanded with EchoTransformer";
@@ -48,7 +46,7 @@ public class EchoTransformer extends RecipeTransformer {
     @Override
     protected JsonNode initTemplateSchema() throws TemplateParameterException{
         try {
-            return getRecipeSerializer().readTree(TEMPLATE_SCHEMA);
+            return RECIPE_SERIALIZER.readTree(TEMPLATE_SCHEMA);
         } catch (JsonProcessingException e) {
             throw new TemplateParameterException(e);
         }

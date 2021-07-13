@@ -13,6 +13,7 @@ import com.aws.greengrass.deployment.templating.exceptions.TemplateParameterExce
 import com.aws.greengrass.deployment.templating.exceptions.TemplateParameterTypeMismatchException;
 import com.aws.greengrass.util.Pair;
 import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.JsonNodeType;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 
@@ -22,6 +23,8 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Optional;
 import javax.annotation.Nullable;
+
+import static com.amazon.aws.iot.greengrass.component.common.SerializerFactory.getRecipeSerializer;
 
 /**
  * Interface representing a runnable that takes as input(s) minimized recipe(s) and generates full recipe(s) and
@@ -41,6 +44,8 @@ public abstract class RecipeTransformer {
     public static final String TEMPLATE_DEFAULT_PARAMETER_KEY = "parameters";
     public static final String TEMPLATE_FIELD_REQUIRED_KEY = "required";
     public static final String TEMPLATE_FIELD_TYPE_KEY = "type";
+
+    public static final ObjectMapper RECIPE_SERIALIZER = getRecipeSerializer();
 
     private final JsonNode templateSchema;
     private JsonNode effectiveDefaultConfig;

@@ -31,6 +31,9 @@ import com.aws.greengrass.deployment.model.DeploymentResult.DeploymentStatus;
 import com.aws.greengrass.deployment.model.DeploymentTask;
 import com.aws.greengrass.deployment.model.DeploymentTaskMetadata;
 import com.aws.greengrass.deployment.model.LocalOverrideRequest;
+import com.aws.greengrass.deployment.templating.TemplateEngine;
+import com.aws.greengrass.deployment.templating.exceptions.RecipeTransformerException;
+import com.aws.greengrass.deployment.templating.exceptions.TemplateExecutionException;
 import com.aws.greengrass.lifecyclemanager.GreengrassService;
 import com.aws.greengrass.lifecyclemanager.Kernel;
 import com.aws.greengrass.lifecyclemanager.KernelAlternatives;
@@ -125,6 +128,8 @@ public class DeploymentService extends GreengrassService {
     private DeploymentDocumentDownloader deploymentDocumentDownloader;
     @Inject
     private ThingGroupHelper thingGroupHelper;
+    @Inject
+    private TemplateEngine templateEngine;
 
     /**
      * Constructor.
@@ -492,6 +497,14 @@ public class DeploymentService extends GreengrassService {
                     return;
                 }
             }
+        }
+
+        templateEngine.init();
+        try {
+            templateEngine.process();
+        } catch (TemplateExecutionException | PackageLoadingException | IOException | RecipeTransformerException e) {
+            logger.atError().log("Error expanding templates", e);
+            updateDeploymentResultAsFailed(deployment, deploymentTask, false, e);
         }
 
 

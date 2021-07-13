@@ -147,25 +147,6 @@ public class DefaultDeploymentTask implements DeploymentTask {
                 throw new InterruptedException("Deployment task is interrupted");
             }
 
-            /* -------------------------------------- TEMPLATING HERE? -------------------------------------- */
-            TemplateEngine engine = new TemplateEngine();
-             engine.process();
-
-            // re-do pre-processing with full templates
-            resolveDependenciesFuture = executorService.submit(() ->
-                    dependencyResolver.resolveDependencies(deploymentDocument, nonTargetGroupsToRootPackagesMap));
-            desiredPackages = resolveDependenciesFuture.get();
-            componentManager.checkPreparePackagesPrerequisites(desiredPackages);
-            preparePackagesFuture = componentManager.preparePackages(desiredPackages);
-            preparePackagesFuture.get();
-            newConfig =
-                    kernelConfigResolver.resolve(desiredPackages, deploymentDocument, new ArrayList<>(rootPackages));
-            if (Thread.currentThread().isInterrupted()) {
-                throw new InterruptedException("Deployment task is interrupted");
-            }
-
-            /* -------------------------------------- END TEMPLATING -------------------------------------- */
-
             deploymentMergeFuture = deploymentConfigMerger.mergeInNewConfig(deployment, newConfig);
 
             // Block this without timeout because it can take a long time for the device to update the config
@@ -177,9 +158,6 @@ public class DefaultDeploymentTask implements DeploymentTask {
 
             componentManager.cleanupStaleVersions();
             return result;
-        } catch (TemplateExecutionException | RecipeTransformerException e) {
-            logger.atError().setCause(e).log("Error occurred while expanding templates");
-            return new DeploymentResult(DeploymentResult.DeploymentStatus.FAILED_NO_STATE_CHANGE, e);
         } catch (PackageLoadingException | DeploymentTaskFailureException | IOException e) {
             logger.atError().setCause(e).log("Error occurred while processing deployment");
             return new DeploymentResult(DeploymentResult.DeploymentStatus.FAILED_NO_STATE_CHANGE, e);
