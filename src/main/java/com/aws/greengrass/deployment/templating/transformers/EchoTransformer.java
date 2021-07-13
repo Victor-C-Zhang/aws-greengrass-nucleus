@@ -38,11 +38,10 @@ public class EchoTransformer extends RecipeTransformer {
      * template.
      *
      * @param templateRecipe to extract default params, param schema.
-     * @param templateConfig the running/custom config for the template.
      * @throws TemplateParameterException if the template recipe or custom config is malformed.
      */
-    public EchoTransformer(ComponentRecipe templateRecipe, JsonNode templateConfig) throws TemplateParameterException {
-        super(templateRecipe, templateConfig);
+    public EchoTransformer(ComponentRecipe templateRecipe) throws TemplateParameterException {
+        super(templateRecipe);
     }
 
     @Override

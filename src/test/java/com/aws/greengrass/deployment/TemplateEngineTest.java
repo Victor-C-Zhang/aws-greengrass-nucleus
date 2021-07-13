@@ -28,6 +28,7 @@ import com.aws.greengrass.logging.impl.LogManager;
 import com.aws.greengrass.status.FleetStatusService;
 import com.aws.greengrass.testcommons.testutilities.GGExtension;
 import com.aws.greengrass.testcommons.testutilities.NoOpPathOwnershipHandler;
+import com.aws.greengrass.util.NucleusPaths;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.vdurmont.semver4j.Semver;
@@ -36,6 +37,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.api.extension.ExtensionContext;
+import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import software.amazon.awssdk.core.exception.SdkClientException;
@@ -210,17 +212,7 @@ class TemplateEngineTest extends BaseITCase {
             }
         });
 
-        List<ComponentIdentifier> desiredPackages = Arrays.asList(
-                new ComponentIdentifier("A", new Semver("1.0.0")),
-                new ComponentIdentifier("ATemplate", new Semver("1.0.0")));
-
-        String configStr = "{\n" + "  \"services\": {\n" + "    \"A\": {\n" + "      \"configuration\": {\n"
-                + "        \"param1\": \"new param 1\",\n" + "        \"param2\": \"new param2\"\n" + "      }\n"
-                + "    },\n" + "    \"ATemplate\": {\n" + "      \"configuration\": {\n"
-                + "        \"resetParam1\": \"new old reset param 1\"\n" + "      }\n" + "    }\n" + "  }\n" + "}\n";
-        Map<String, Object> configMap = OBJECT_MAPPER.readValue(configStr, HashMap.class);
-        TemplateEngine templateEngine = new TemplateEngine(recipeWorkDir, artifactsWorkDir, desiredPackages,
-                configMap, mockComponentStore);
+        TemplateEngine templateEngine = new TemplateEngine(recipeWorkDir, artifactsWorkDir, mockComponentStore);
         templateEngine.process();
     }
 

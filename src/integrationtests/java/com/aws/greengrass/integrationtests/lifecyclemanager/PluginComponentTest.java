@@ -108,7 +108,6 @@ class PluginComponentTest extends BaseITCase {
     private static Future<DeploymentResult> submitSampleJobDocument(DeploymentDocument sampleJobDocument,
                                                                     Kernel kernel) {
         ComponentManager componentManager = kernel.getContext().get(ComponentManager.class);
-        ComponentStore componentStore = kernel.getContext().get(ComponentStore.class);
         DependencyResolver dependencyResolver = kernel.getContext().get(DependencyResolver.class);
         KernelConfigResolver kernelConfigResolver = kernel.getContext().get(KernelConfigResolver.class);
         DeploymentConfigMerger deploymentConfigMerger = kernel.getContext().get(DeploymentConfigMerger.class);
@@ -119,7 +118,7 @@ class PluginComponentTest extends BaseITCase {
                         new Deployment(sampleJobDocument, Deployment.DeploymentType.IOT_JOBS, "jobId", DEFAULT),
                         Topics.of(kernel.getContext(), DeploymentService.DEPLOYMENT_SERVICE_TOPICS, null),
                         kernel.getContext().get(ExecutorService.class), deploymentDocumentDownloader,
-                        thingGroupHelper, componentStore, kernel.getNucleusPaths());
+                        thingGroupHelper);
         return kernel.getContext().get(ExecutorService.class).submit(deploymentTask);
     }
 

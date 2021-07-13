@@ -1191,7 +1191,7 @@ class DeploymentTaskIntegrationTest {
                         deploymentConfigMerger, logger,
                         new Deployment(sampleJobDocument, Deployment.DeploymentType.IOT_JOBS, "jobId", DEFAULT),
                         deploymentServiceTopics, kernel.getContext().get(ExecutorService.class),
-                        deploymentDocumentDownloader, thingGroupHelper, componentStore, kernel.getNucleusPaths());
+                        deploymentDocumentDownloader, thingGroupHelper);
         return executorService.submit(deploymentTask);
     }
 }

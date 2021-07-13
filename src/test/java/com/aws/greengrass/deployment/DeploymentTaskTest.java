@@ -6,7 +6,6 @@
 package com.aws.greengrass.deployment;
 
 import com.aws.greengrass.componentmanager.ComponentManager;
-import com.aws.greengrass.componentmanager.ComponentStore;
 import com.aws.greengrass.componentmanager.DependencyResolver;
 import com.aws.greengrass.componentmanager.KernelConfigResolver;
 import com.aws.greengrass.componentmanager.exceptions.PackageLoadingException;
@@ -21,7 +20,6 @@ import com.aws.greengrass.deployment.model.DeploymentResult;
 import com.aws.greengrass.logging.api.Logger;
 import com.aws.greengrass.logging.impl.LogManager;
 import com.aws.greengrass.testcommons.testutilities.GGExtension;
-import com.aws.greengrass.util.NucleusPaths;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
@@ -70,10 +68,6 @@ class DeploymentTaskTest {
     private DependencyResolver mockDependencyResolver;
     @Mock
     private ComponentManager mockComponentManager;
-    @Mock
-    private ComponentStore mockComponentStore;
-    @Mock
-    private NucleusPaths mockNucleusPaths;
     @Mock
     private KernelConfigResolver mockKernelConfigResolver;
     @Mock
@@ -124,7 +118,7 @@ class DeploymentTaskTest {
                         mockDeploymentConfigMerger, logger,
                         new Deployment(deploymentDocument, Deployment.DeploymentType.IOT_JOBS, "jobId", DEFAULT),
                         mockDeploymentServiceConfig, mockExecutorService, deploymentDocumentDownloader,
-                        thingGroupHelper, mockComponentStore, mockNucleusPaths);
+                        thingGroupHelper);
     }
 
     @Test

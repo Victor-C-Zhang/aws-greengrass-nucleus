@@ -22,7 +22,7 @@ public class TransformerWrapper {
     RecipeTransformer transformer;
 
     /**
-     * Function to execute expansion.
+     * Constructor. Generates an execution wrapper for a particular template.
      * @param pathToExecutable  the jar to run.
      * @param className         the name of the parser class.
      * @param template          the template recipe file.
@@ -32,8 +32,7 @@ public class TransformerWrapper {
      * @throws IllegalAccessException       idk...
      * @throws RecipeTransformerException   for everything else.
      */
-    public TransformerWrapper(Path pathToExecutable, String className, ComponentRecipe template,
-                              JsonNode templateConfig)
+    public TransformerWrapper(Path pathToExecutable, String className, ComponentRecipe template)
             throws RecipeTransformerException, ClassNotFoundException, IllegalTransformerException,
             NoSuchMethodException, InvocationTargetException, InstantiationException, IllegalAccessException {
         if (!pathToExecutable.toFile().exists()) {
@@ -54,8 +53,8 @@ public class TransformerWrapper {
         }
 
         transformer = (RecipeTransformer) recipeTransformerClass
-                        .getConstructor(ComponentRecipe.class, JsonNode.class)
-                        .newInstance(template, templateConfig);
+                        .getConstructor(ComponentRecipe.class)
+                        .newInstance(template);
 
         try {
             loader.close();
@@ -64,8 +63,8 @@ public class TransformerWrapper {
         }
     }
 
-    Pair<ComponentRecipe, List<Path>> expandOne(TemplateParameterBundle parameterBundle)
+    Pair<ComponentRecipe, List<Path>> expandOne(ComponentRecipe paramFile)
             throws RecipeTransformerException {
-        return transformer.execute(parameterBundle.getLeft(), parameterBundle.getRight());
+        return transformer.execute(paramFile);
     }
 }

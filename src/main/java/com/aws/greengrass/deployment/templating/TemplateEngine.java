@@ -12,9 +12,9 @@ import com.aws.greengrass.componentmanager.exceptions.PackageLoadingException;
 import com.aws.greengrass.componentmanager.models.ComponentIdentifier;
 import com.aws.greengrass.deployment.templating.exceptions.IllegalTemplateDependencyException;
 import com.aws.greengrass.deployment.templating.exceptions.MultipleTemplateDependencyException;
+import com.aws.greengrass.util.NucleusPaths;
 import com.aws.greengrass.util.Pair;
 import com.aws.greengrass.util.Utils;
-import com.fasterxml.jackson.databind.JsonNode;
 
 import java.io.File;
 import java.io.IOException;
@@ -29,45 +29,53 @@ import java.util.Map;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
+import javax.inject.Inject;
+
 import static com.amazon.aws.iot.greengrass.component.common.SerializerFactory.getRecipeSerializer;
 import static com.amazon.aws.iot.greengrass.component.common.SerializerFactory.getRecipeSerializerJson;
-import static com.aws.greengrass.componentmanager.KernelConfigResolver.CONFIGURATION_CONFIG_KEY;
-import static com.aws.greengrass.deployment.templating.RecipeTransformer.TEMPLATE_DEFAULT_PARAMETER_KEY;
-import static com.aws.greengrass.lifecyclemanager.GreengrassService.SERVICES_NAMESPACE_TOPIC;
 
+/**
+ * Template expansion workflow. Assumes the deployment is local and has all the required components/dependencies
+ * necessary without appealing to the cloud. That is, if there is an unsatisfied template dependency, the deployment
+ * will fail.
+ */
 public class TemplateEngine {
     public static final String PARSER_JAR = "transformer.jar";
 
     private final Path recipeDirectoryPath;
     private final Path artifactsDirectoryPath;
-    private final ComponentStore componentStore;
-    private final Map<String, ComponentIdentifier> resolvedVersions;
-    private final Map<String, Object> configMap;
+    @Inject
+    private ComponentStore componentStore;
+    @Inject
+    private NucleusPaths nucleusPaths;
 
     private final Map<ComponentIdentifier, ComponentRecipe> recipes = new HashMap<>();
+    private final Map<String, ComponentIdentifier> templates = new HashMap<>();
     private final Map<String, List<ComponentIdentifier>> needsToBeBuilt = new HashMap<>();
 
     /**
      * Constructor.
+     */
+    @Inject
+    public TemplateEngine() {
+        recipeDirectoryPath = nucleusPaths.recipePath();
+        artifactsDirectoryPath = nucleusPaths.artifactPath();
+    }
+
+    /**
+     * Constructor for testing only.
      * @param recipeDirectoryPath       the directory in which to expand and clean up templates.
      * @param artifactsDirectoryPath    the directory in which to prepare artifacts.
-     * @param desiredPackages           the resolved list of packages requested on the device.
-     * @param configMap                 a copy of the map representing the resolved config.
-     * @param componentStore            ComponentStore instance.
+     * @param componentStore            a ComponentStore instance.
      */
-    public TemplateEngine(Path recipeDirectoryPath, Path artifactsDirectoryPath,
-                          List<ComponentIdentifier> desiredPackages, Map<String, Object> configMap,
-                          ComponentStore componentStore) {
+    public TemplateEngine(Path recipeDirectoryPath, Path artifactsDirectoryPath, ComponentStore componentStore) {
         this.recipeDirectoryPath = recipeDirectoryPath;
         this.artifactsDirectoryPath = artifactsDirectoryPath;
-        resolvedVersions = new HashMap<>();
-        desiredPackages.forEach(identifier -> resolvedVersions.put(identifier.getName(), identifier));
-        this.configMap = configMap;
         this.componentStore = componentStore;
     }
 
     /**
-     * Call to do templating. This call assumes we have already resolved component versions and fetched dependencies.
+     * Call to do templating. This call assumes we do not need to resolve component versions or fetch dependencies.
      * @throws TemplateExecutionException           if pre-processing throws an error.
      * @throws IOException                          for most things.
      * @throws PackageLoadingException              if we can't load a dependency.
@@ -97,6 +105,9 @@ public class TemplateEngine {
                     ComponentIdentifier identifier = new ComponentIdentifier(recipe.getComponentName(),
                             recipe.getComponentVersion());
                     recipes.put(identifier, recipe);
+                    if (recipe.getComponentName().endsWith("Template")) { // TODO: same as above
+                        templates.put(recipe.getComponentName(), identifier);
+                    }
                     Map<String, DependencyProperties> deps = recipe.getComponentDependencies();
                     if (deps == null) {
                         continue;
@@ -126,19 +137,10 @@ public class TemplateEngine {
     void expandAll() throws PackageLoadingException, RecipeTransformerException,
             IOException {
         for (Map.Entry<String, List<ComponentIdentifier>> entry : needsToBeBuilt.entrySet()) {
-//            // TODO: get resolved component from existing map
-//            ComponentIdentifier template = null;
-//            for (ComponentIdentifier potentialTemplate : templates) {
-//                if (potentialTemplate.getName().equals(entry.getKey())) {
-//                    template = potentialTemplate; // find first lol
-//                    break;
-//                }
-//            }
-//            if (template == null) {
-//                throw new PackageLoadingException("Could not find template: " + entry.getKey());
-//            }
-//            // END TODO
-            ComponentIdentifier template = resolvedVersions.get(entry.getKey());
+            ComponentIdentifier template = templates.get(entry.getKey());
+            if (template == null) {
+                throw new PackageLoadingException("Could not get template component " + entry.getKey());
+            }
             expandAllForTemplate(template, entry.getValue());
         }
     }
@@ -148,24 +150,18 @@ public class TemplateEngine {
         Path templateExecutablePath =
                 artifactsDirectoryPath.resolve(template.getName()).resolve(template.getVersion().toString()).resolve(
                         PARSER_JAR);
-        JsonNode serviceConfigMap = getRecipeSerializer().readTree(
-                getRecipeSerializer().writeValueAsString(configMap.get(SERVICES_NAMESPACE_TOPIC)));
-
-        JsonNode templateConfig = serviceConfigMap.get(template.getName()).get(CONFIGURATION_CONFIG_KEY)
-                .get(TEMPLATE_DEFAULT_PARAMETER_KEY);
         TransformerWrapper wrapper;
         try {
             wrapper = new TransformerWrapper(templateExecutablePath,
                     "com.aws.greengrass.deployment.templating.transformers.EchoTransformer",
-                    recipes.get(template), templateConfig);
+                    recipes.get(template));
         } catch (ClassNotFoundException | IllegalTransformerException | NoSuchMethodException
                 | InvocationTargetException | InstantiationException | IllegalAccessException e) {
             throw new RecipeTransformerException("Could not instantiate the transformer for template " + template.getName(), e);
         }
         for (ComponentIdentifier paramFile : paramFiles) {
-            JsonNode componentConfig = serviceConfigMap.get(paramFile.getName()).get(CONFIGURATION_CONFIG_KEY);
             Pair<ComponentRecipe, List<Path>> rt =
-                    wrapper.expandOne(new TemplateParameterBundle(recipes.get(paramFile), componentConfig));
+                    wrapper.expandOne(recipes.get(paramFile));
             componentStore.savePackageRecipe(paramFile, getRecipeSerializer().writeValueAsString(rt.getLeft()));
             Path componentArtifactsDirectory = componentStore.resolveArtifactDirectoryPath(paramFile);
             for (Path artifactPath : rt.getRight()) {

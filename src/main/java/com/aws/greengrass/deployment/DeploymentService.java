@@ -641,7 +641,7 @@ public class DeploymentService extends GreengrassService {
         }
         return new DefaultDeploymentTask(dependencyResolver, componentManager, kernelConfigResolver,
                 deploymentConfigMerger, logger.createChild(), deployment, config, executorService,
-                deploymentDocumentDownloader, thingGroupHelper, componentStore, kernel.getNucleusPaths());
+                deploymentDocumentDownloader, thingGroupHelper);
     }
 
     private DeploymentDocument parseAndValidateJobDocument(Deployment deployment) throws InvalidRequestException {

@@ -11,7 +11,6 @@ import com.aws.greengrass.deployment.templating.exceptions.MissingTemplateParame
 import com.aws.greengrass.deployment.templating.exceptions.TemplateParameterTypeMismatchException;
 import com.aws.greengrass.util.Pair;
 import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import com.fasterxml.jackson.databind.node.JsonNodeType;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 
@@ -48,13 +47,12 @@ public abstract class RecipeTransformer {
      * Constructor. One class instance for each template; instances are shared between parameter files for the same
      * template.
      * @param templateRecipe to extract default params, param schema.
-     * @param templateConfig the running/custom config for the template.
      * @throws TemplateParameterException if the template recipe or custom config is malformed.
      */
-    public RecipeTransformer(ComponentRecipe templateRecipe, JsonNode templateConfig)
+    public RecipeTransformer(ComponentRecipe templateRecipe)
             throws TemplateParameterException {
         templateSchema = initTemplateSchema();
-        templateConfig(templateRecipe.getComponentConfiguration().getDefaultConfiguration(), templateConfig);
+        templateConfig(templateRecipe.getComponentConfiguration().getDefaultConfiguration());
     }
 
     /**
@@ -67,35 +65,32 @@ public abstract class RecipeTransformer {
     /**
      * Stateless expansion for one component.
      * @param parameterFile the parameter file for the component.
-     * @param componentConfig any custom/runtime config mapping for that component.
      * @return a pair. See the declaration for {@link #transform(ComponentRecipe, JsonNode) transform} for more details.
      * @throws RecipeTransformerException if the provided parameters violate the template schema.
      */
-    public Pair<ComponentRecipe, List<Path>> execute(ComponentRecipe parameterFile, JsonNode componentConfig)
-            throws RecipeTransformerException {
-        JsonNode effectiveComponentConfig = mergeAndValidateComponentConfig(parameterFile, componentConfig);
-        return transform(parameterFile, effectiveComponentConfig);
+    public Pair<ComponentRecipe, List<Path>> execute(ComponentRecipe parameterFile) throws RecipeTransformerException {
+        JsonNode effectiveComponentParams = mergeAndValidateComponentParams(parameterFile);
+        return transform(parameterFile, effectiveComponentParams);
     }
 
     /**
      * Transforms the parameter file into a full recipe.
      * @param paramFile the parameter file object.
-     * @param componentConfig the effective component config to use during expansion.
+     * @param componentParams the effective component parameters to use during expansion.
      * @return a pair consisting of {newRecipe, artifactsToCopy}. newRecipe is the expanded recipe file;
      * artifactsToCopy is a list of artifacts to inject into the expanded component's runtime artifact directory.
      * @throws RecipeTransformerException if there is any error with the transformation.
      */
-    public abstract Pair<ComponentRecipe, List<Path>> transform(ComponentRecipe paramFile, JsonNode componentConfig)
+    public abstract Pair<ComponentRecipe, List<Path>> transform(ComponentRecipe paramFile, JsonNode componentParams)
             throws RecipeTransformerException;
 
     /**
-     * Note the configuration of the template itself. Validates provided defaults and custom configs.
+     * Note the configuration of the template itself. Validates provided defaults.
      * @param defaultConfig the DefaultConfiguration recipe key.
-     * @param activeConfig a map of configuration values specified in lieu of defaults.
      * @throws TemplateParameterException if the template recipe file or given configuration is malformed.
      */
     @SuppressWarnings({"PMD.ForLoopCanBeForeach", "PMD.AvoidDuplicateLiterals"})
-    protected void templateConfig(JsonNode defaultConfig, JsonNode activeConfig) throws
+    protected void templateConfig(JsonNode defaultConfig) throws
             TemplateParameterException {
         // validate schema in template matches internal schema, just for good measure
         JsonNode recipeProvidedSchema = defaultConfig.get(TEMPLATE_PARAMETER_SCHEMA_KEY);
@@ -110,12 +105,11 @@ public abstract class RecipeTransformer {
         }
 
         // validate hard-coded/user-provided "default configs"
-        JsonNode defaultNode = mergeParams(defaultConfig.deepCopy().get(TEMPLATE_DEFAULT_PARAMETER_KEY), activeConfig)
-                .orElseGet(JsonNodeFactory.instance::objectNode);
+        JsonNode defaultNode = defaultConfig.get(TEMPLATE_DEFAULT_PARAMETER_KEY);
         // check both ways
         for (Iterator<String> it = templateSchema.fieldNames(); it.hasNext(); ) {
             String field = it.next();
-            if (!activeConfig.has(field)
+            if (!defaultNode.has(field)
                     && !(getTitleInsensitive(templateSchema.get(field), TEMPLATE_FIELD_REQUIRED_KEY)).asBoolean()) {
                 throw new MissingTemplateParameterException("Template does not provide default for optional "
                         + "parameter: " + field);
@@ -124,7 +118,7 @@ public abstract class RecipeTransformer {
                 ((ObjectNode)defaultNode).remove(field);
                 continue;
             }
-            JsonNode defaultVal = activeConfig.get(field);
+            JsonNode defaultVal = defaultNode.get(field);
             if (nodeType(templateSchema.get(field).get(TEMPLATE_FIELD_TYPE_KEY).asText()) != defaultVal.getNodeType()) {
                 throw new TemplateParameterTypeMismatchException("Template default value does not match schema. "
                         + "Expected " + nodeType(templateSchema.get(field).get(TEMPLATE_FIELD_TYPE_KEY).asText())
@@ -142,12 +136,9 @@ public abstract class RecipeTransformer {
         effectiveDefaultConfig = defaultNode;
     }
 
-    protected JsonNode mergeAndValidateComponentConfig(ComponentRecipe paramFile, JsonNode componentConfig)
-            throws RecipeTransformerException{
-        JsonNode paramNode = componentConfig.deepCopy();
-        paramNode =
-                mergeParams(paramFile.getComponentConfiguration().getDefaultConfiguration(), paramNode)
-                        .orElseGet(JsonNodeFactory.instance::objectNode);
+    protected JsonNode mergeAndValidateComponentParams(ComponentRecipe paramFile)
+            throws RecipeTransformerException {
+        JsonNode paramNode = paramFile.getComponentConfiguration().getDefaultConfiguration();
         JsonNode mergedParams = mergeParams(effectiveDefaultConfig, paramNode).get();
         try {
             validateParams(mergedParams);
