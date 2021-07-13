@@ -5,8 +5,6 @@
 
 package com.aws.greengrass.deployment.templating.exceptions;
 
-import com.aws.greengrass.deployment.templating.TemplateParameterException;
-
 public class TemplateParameterTypeMismatchException extends TemplateParameterException {
     private static final long serialVersionUID = 1422205784013132313L;
 

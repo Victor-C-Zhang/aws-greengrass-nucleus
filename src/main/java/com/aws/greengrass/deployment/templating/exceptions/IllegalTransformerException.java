@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-package com.aws.greengrass.deployment.templating;
+package com.aws.greengrass.deployment.templating.exceptions;
 
 public class IllegalTransformerException extends Exception {
     private static final long serialVersionUID = 5974408401386072124L;

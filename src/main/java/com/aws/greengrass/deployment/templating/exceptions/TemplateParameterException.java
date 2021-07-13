@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-package com.aws.greengrass.deployment.templating;
+package com.aws.greengrass.deployment.templating.exceptions;
 
 public class TemplateParameterException extends Exception {
     private static final long serialVersionUID = 7301618807263349618L;

@@ -5,8 +5,6 @@
 
 package com.aws.greengrass.deployment.templating.exceptions;
 
-import com.aws.greengrass.deployment.templating.TemplateExecutionException;
-
 public class IllegalTemplateDependencyException extends TemplateExecutionException {
     private static final long serialVersionUID = 2405458707367333187L;
 

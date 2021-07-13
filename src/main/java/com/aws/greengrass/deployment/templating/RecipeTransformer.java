@@ -8,6 +8,8 @@ package com.aws.greengrass.deployment.templating;
 import com.amazon.aws.iot.greengrass.component.common.ComponentRecipe;
 import com.aws.greengrass.deployment.templating.exceptions.IllegalTemplateParameterException;
 import com.aws.greengrass.deployment.templating.exceptions.MissingTemplateParameterException;
+import com.aws.greengrass.deployment.templating.exceptions.RecipeTransformerException;
+import com.aws.greengrass.deployment.templating.exceptions.TemplateParameterException;
 import com.aws.greengrass.deployment.templating.exceptions.TemplateParameterTypeMismatchException;
 import com.aws.greengrass.util.Pair;
 import com.fasterxml.jackson.databind.JsonNode;

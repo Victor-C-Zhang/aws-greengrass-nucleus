@@ -6,6 +6,8 @@
 package com.aws.greengrass.deployment.templating;
 
 import com.amazon.aws.iot.greengrass.component.common.ComponentRecipe;
+import com.aws.greengrass.deployment.templating.exceptions.IllegalTransformerException;
+import com.aws.greengrass.deployment.templating.exceptions.RecipeTransformerException;
 import com.aws.greengrass.logging.api.Logger;
 import com.aws.greengrass.util.Pair;
 
