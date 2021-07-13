@@ -65,7 +65,7 @@ public abstract class RecipeTransformer {
     /**
      * Workaround to declaring an "abstract" template schema field.
      * @return a JsonNode representing the desired template schema. Can be a node with no fields, representing a pure
-     * substitution template.
+     *     substitution template.
      */
     protected abstract JsonNode initTemplateSchema() throws TemplateParameterException;
 
@@ -85,7 +85,7 @@ public abstract class RecipeTransformer {
      * @param paramFile the parameter file object.
      * @param componentParams the effective component parameters to use during expansion.
      * @return a pair consisting of {newRecipe, artifactsToCopy}. newRecipe is the expanded recipe file;
-     * artifactsToCopy is a list of artifacts to inject into the expanded component's runtime artifact directory.
+     *     artifactsToCopy is a list of artifacts to inject into the expanded component's runtime artifact directory.
      * @throws RecipeTransformerException if there is any error with the transformation.
      */
     public abstract Pair<ComponentRecipe, List<Path>> transform(ComponentRecipe paramFile, JsonNode componentParams)
@@ -156,9 +156,7 @@ public abstract class RecipeTransformer {
     }
 
 
-    /*****************************************
-      Utility functions for validation/etc
-     *****************************************/
+    /* Utility functions */
     @SuppressWarnings("PMD.ForLoopCanBeForeach")
     void validateParams(JsonNode params) throws TemplateParameterException {
         // check both ways

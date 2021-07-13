@@ -44,7 +44,7 @@ public class EchoTransformer extends RecipeTransformer {
     }
 
     @Override
-    protected JsonNode initTemplateSchema() throws TemplateParameterException{
+    protected JsonNode initTemplateSchema() throws TemplateParameterException {
         try {
             return RECIPE_SERIALIZER.readTree(TEMPLATE_SCHEMA);
         } catch (JsonProcessingException e) {

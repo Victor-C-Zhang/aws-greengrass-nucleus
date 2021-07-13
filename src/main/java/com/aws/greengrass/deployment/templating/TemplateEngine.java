@@ -31,7 +31,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
-
 import javax.inject.Inject;
 
 import static com.amazon.aws.iot.greengrass.component.common.SerializerFactory.getRecipeSerializer;
@@ -73,14 +72,19 @@ public class TemplateEngine {
         this.componentStore = componentStore;
     }
 
-    public void init() {
-        init(nucleusPaths.recipePath(), nucleusPaths.artifactPath());
-    }
-
+    /**
+     * Post-inject initializer for recipe and artifacts directories.
+     * @param recipeDirectoryPath       the component store recipe root.
+     * @param artifactsDirectoryPath    the component store artifacts root.
+     */
     public void init(Path recipeDirectoryPath, Path artifactsDirectoryPath) {
         this.recipeDirectoryPath = recipeDirectoryPath;
         this.artifactsDirectoryPath = artifactsDirectoryPath;
         hasBeenInited = true;
+    }
+
+    public void init() {
+        init(nucleusPaths.recipePath(), nucleusPaths.artifactPath());
     }
 
     /**
@@ -170,7 +174,8 @@ public class TemplateEngine {
                     recipes.get(template));
         } catch (ClassNotFoundException | IllegalTransformerException | NoSuchMethodException
                 | InvocationTargetException | InstantiationException | IllegalAccessException e) {
-            throw new RecipeTransformerException("Could not instantiate the transformer for template " + template.getName(), e);
+            throw new RecipeTransformerException("Could not instantiate the transformer for template "
+                    + template.getName(), e);
         }
         for (ComponentIdentifier paramFile : paramFiles) {
             Pair<ComponentRecipe, List<Path>> rt =
