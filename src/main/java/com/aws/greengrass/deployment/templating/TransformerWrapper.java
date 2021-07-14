@@ -58,8 +58,7 @@ public class TransformerWrapper {
             });
             Class<?> recipeTransformerClass = Class.forName(className, true, loader);
             if (!RecipeTransformer.class.isAssignableFrom(recipeTransformerClass)) {
-                throw new IllegalTransformerException(className + " does not implement the RecipeTransformer "
-                        + "interface");
+                throw new IllegalTransformerException(className + " does not extend the RecipeTransformer class");
             }
             transformer = (RecipeTransformer) recipeTransformerClass
                     .getConstructor(ComponentRecipe.class)
