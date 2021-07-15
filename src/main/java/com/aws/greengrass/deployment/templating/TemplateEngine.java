@@ -17,15 +17,12 @@ import com.aws.greengrass.deployment.templating.exceptions.RecipeTransformerExce
 import com.aws.greengrass.deployment.templating.exceptions.TemplateExecutionException;
 import com.aws.greengrass.util.NucleusPaths;
 import com.aws.greengrass.util.Pair;
-import com.aws.greengrass.util.Utils;
 
-import java.io.File;
 import java.io.IOException;
 import java.lang.reflect.InvocationTargetException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
-import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -34,7 +31,7 @@ import java.util.stream.Stream;
 import javax.inject.Inject;
 
 import static com.amazon.aws.iot.greengrass.component.common.SerializerFactory.getRecipeSerializer;
-import static com.amazon.aws.iot.greengrass.component.common.SerializerFactory.getRecipeSerializerJson;
+import static com.aws.greengrass.deployment.DeploymentService.parseFile;
 
 /**
  * Template expansion workflow. Assumes the deployment is local and has all the required components/dependencies
@@ -51,11 +48,9 @@ public class TemplateEngine {
     @Inject
     private NucleusPaths nucleusPaths;
 
-    private final Map<ComponentIdentifier, ComponentRecipe> recipes = new HashMap<>();
-    private final Map<String, ComponentIdentifier> templates = new HashMap<>();
-    private final Map<String, List<ComponentIdentifier>> needsToBeBuilt = new HashMap<>();
-
-    private boolean hasBeenInited; // init recipe/artifact paths after construction and injection
+    private Map<ComponentIdentifier, ComponentRecipe> recipes;
+    private Map<String, ComponentIdentifier> templates;
+    private Map<String, List<ComponentIdentifier>> needsToBeBuilt;
 
     /**
      * Constructor.
@@ -73,37 +68,46 @@ public class TemplateEngine {
     }
 
     /**
-     * Post-inject initializer for recipe and artifacts directories.
-     * @param recipeDirectoryPath       the component store recipe root.
-     * @param artifactsDirectoryPath    the component store artifacts root.
+     * Call to do templating. This call assumes we do not need to resolve component versions or fetch dependencies.
+     * @throws TemplateExecutionException   if pre-processing throws an error.
+     * @throws IOException                  for most things.
+     * @throws PackageLoadingException      if we can't load a dependency.
+     * @throws RecipeTransformerException   if individual templating runs into an issue.
      */
-    public void init(Path recipeDirectoryPath, Path artifactsDirectoryPath) {
-        this.recipeDirectoryPath = recipeDirectoryPath;
-        this.artifactsDirectoryPath = artifactsDirectoryPath;
-        hasBeenInited = true;
-    }
-
-    public void init() {
-        init(nucleusPaths.recipePath(), nucleusPaths.artifactPath());
+    public void process() throws TemplateExecutionException, IOException, PackageLoadingException,
+            RecipeTransformerException {
+        process(nucleusPaths.recipePath(), nucleusPaths.artifactPath());
     }
 
     /**
-     * Call to do templating. This call assumes we do not need to resolve component versions or fetch dependencies.
-     * @throws TemplateExecutionException           if pre-processing throws an error.
-     * @throws IOException                          for most things.
-     * @throws PackageLoadingException              if we can't load a dependency.
-     * @throws RecipeTransformerException           if individual templating runs into an issue.
+     * Processing method for unit testing.
+     * @param recipeDirectoryPath           the component store recipe root.
+     * @param artifactsDirectoryPath        the component store artifacts root.
+     * @throws TemplateExecutionException   if pre-processing throws an error.
+     * @throws IOException                  for most things.
+     * @throws PackageLoadingException      if we can't load a dependency.
+     * @throws RecipeTransformerException   if individual templating runs into an issue.
      */
-    public void process() throws TemplateExecutionException, IOException,
-            PackageLoadingException, RecipeTransformerException {
-        if (!hasBeenInited) {
-            throw new TemplateExecutionException("Template engine has not been initialized. This is a"
-                    + " problem for the developer not the user.");
-        }
+    @SuppressWarnings("PMD.NullAssignment")
+    public void process(Path recipeDirectoryPath, Path artifactsDirectoryPath) throws TemplateExecutionException,
+            IOException, PackageLoadingException, RecipeTransformerException {
+        this.recipeDirectoryPath = recipeDirectoryPath;
+        this.artifactsDirectoryPath = artifactsDirectoryPath;
+
+        // init state
+        recipes = new HashMap<>();
+        templates = new HashMap<>();
+        needsToBeBuilt = new HashMap<>();
+
         loadComponents();
         // TODO: resolve versioning, download dependencies if necessary
         expandAll();
         removeTemplatesFromStore();
+
+        // cleanup state
+        recipes = null;
+        templates = null;
+        needsToBeBuilt = null;
     }
 
     /**
@@ -215,48 +219,5 @@ public class TemplateEngine {
         } catch (PackageLoadingException e) {
             throw new TemplateExecutionException("Could not delete template component", e);
         }
-    }
-
-    void removeCorrespondingArtifactsFromStore(String templateName) throws IOException {
-        try (Stream<Path> files = Files.walk(artifactsDirectoryPath)) {
-            for (Path r : files.collect(Collectors.toList())) {
-                if (r.toFile().isDirectory() && r.toFile().getName().equals(templateName)) {
-                    Files.walk(r).sorted(Comparator.reverseOrder()).map(Path::toFile).forEach(File::delete);
-                }
-            }
-        }
-    }
-
-    // copied from DeploymentService.copyRecipeFileToComponentStore()
-    ComponentRecipe parseFile(Path recipePath) throws IOException {
-        String ext = Utils.extension(recipePath.toString());
-        ComponentRecipe recipe = null;
-        try {
-            if (recipePath.toFile().length() > 0) {
-                switch (ext.toLowerCase()) {
-                    case "yaml":
-                    case "yml":
-                        recipe = getRecipeSerializer().readValue(recipePath.toFile(), ComponentRecipe.class);
-                        break;
-                    case "json":
-                        recipe = getRecipeSerializerJson().readValue(recipePath.toFile(), ComponentRecipe.class);
-                        break;
-                    default:
-                        break;
-                }
-            }
-        } catch (IOException e) {
-            // Throw on error so that the user will receive this message and we will stop the deployment.
-            // This is to fail fast while providing actionable feedback.
-            throw new IOException(
-                    String.format("Unable to parse %s as a recipe due to: %s", recipePath.toString(), e.getMessage()),
-                    e);
-        }
-        if (recipe == null) {
-            // logger.atError().log("Skipping file {} because it was not recognized as a recipe", recipePath);
-            return null;
-        }
-
-        return recipe;
     }
 }
