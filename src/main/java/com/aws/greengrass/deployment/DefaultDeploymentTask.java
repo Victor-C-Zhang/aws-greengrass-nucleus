@@ -26,6 +26,7 @@ import com.vdurmont.semver4j.Semver;
 import lombok.Getter;
 
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -108,13 +109,6 @@ public class DefaultDeploymentTask implements DeploymentTask {
             Map<String, Set<ComponentIdentifier>> nonTargetGroupsToRootPackagesMap =
                     getNonTargetGroupToRootPackagesMap(deploymentDocument);
 
-            // Root packages for the target group is taken from deployment document.
-            Set<String> rootPackages = new HashSet<>(deploymentDocument.getRootPackages());
-            // Add root components from non-target groups.
-            nonTargetGroupsToRootPackagesMap.values().forEach(packages -> {
-                packages.forEach(p -> rootPackages.add(p.getName()));
-            });
-
             resolveDependenciesFuture = executorService.submit(() ->
                     dependencyResolver.resolveDependencies(deploymentDocument, nonTargetGroupsToRootPackagesMap));
 
@@ -150,10 +144,16 @@ public class DefaultDeploymentTask implements DeploymentTask {
                             deployment.getDeploymentDocumentObj().getDeploymentPackageConfigurationList(),
                             new HashSet<>(separatedPackageList.getRight()));
             deployment.getDeploymentDocumentObj().setDeploymentPackageConfigurationList(packageListLessTemplates);
-            List<String> rootPackagesLessTemplates = deploymentDocument.getRootPackages();
+
+            // Root packages for the target group is taken from deployment document.
+            // Add root components from non-target groups.
+            Set<String> rootPackages = new HashSet<>(deploymentDocument.getRootPackages());
+            nonTargetGroupsToRootPackagesMap.values().forEach(packages -> {
+                packages.forEach(p -> rootPackages.add(p.getName()));
+            });
 
             Map<String, Object> newConfig = kernelConfigResolver.resolve(desiredPackages, deploymentDocument,
-                    rootPackagesLessTemplates);
+                    new ArrayList<>(rootPackages));
             if (Thread.currentThread().isInterrupted()) {
                 throw new InterruptedException("Deployment task is interrupted");
             }
