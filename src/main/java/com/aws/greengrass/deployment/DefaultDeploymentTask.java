@@ -15,15 +15,17 @@ import com.aws.greengrass.config.Topics;
 import com.aws.greengrass.deployment.exceptions.DeploymentTaskFailureException;
 import com.aws.greengrass.deployment.model.Deployment;
 import com.aws.greengrass.deployment.model.DeploymentDocument;
+import com.aws.greengrass.deployment.model.DeploymentPackageConfiguration;
 import com.aws.greengrass.deployment.model.DeploymentResult;
 import com.aws.greengrass.deployment.model.DeploymentTask;
+import com.aws.greengrass.deployment.templating.TemplateEngine;
 import com.aws.greengrass.logging.api.Logger;
 import com.aws.greengrass.util.Coerce;
+import com.aws.greengrass.util.Pair;
 import com.vdurmont.semver4j.Semver;
 import lombok.Getter;
 
 import java.io.IOException;
-import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -138,8 +140,20 @@ public class DefaultDeploymentTask implements DeploymentTask {
             preparePackagesFuture = componentManager.preparePackages(desiredPackages);
             preparePackagesFuture.get();
 
-            Map<String, Object> newConfig =
-                    kernelConfigResolver.resolve(desiredPackages, deploymentDocument, new ArrayList<>(rootPackages));
+            // remove templates from deployment
+            Pair<List<ComponentIdentifier>, List<ComponentIdentifier>> separatedPackageList =
+                    TemplateEngine.separateTemplatesFromPackageList(desiredPackages);
+            desiredPackages = separatedPackageList.getLeft();
+
+            List<DeploymentPackageConfiguration> packageListLessTemplates =
+                    TemplateEngine.deploymentPackageConfigurationListLessTemplates(
+                            deployment.getDeploymentDocumentObj().getDeploymentPackageConfigurationList(),
+                            new HashSet<>(separatedPackageList.getRight()));
+            deployment.getDeploymentDocumentObj().setDeploymentPackageConfigurationList(packageListLessTemplates);
+            List<String> rootPackagesLessTemplates = deploymentDocument.getRootPackages();
+
+            Map<String, Object> newConfig = kernelConfigResolver.resolve(desiredPackages, deploymentDocument,
+                    rootPackagesLessTemplates);
             if (Thread.currentThread().isInterrupted()) {
                 throw new InterruptedException("Deployment task is interrupted");
             }
@@ -153,6 +167,7 @@ public class DefaultDeploymentTask implements DeploymentTask {
                     .log("Finished deployment task");
 
             componentManager.cleanupStaleVersions();
+
             return result;
         } catch (PackageLoadingException | DeploymentTaskFailureException | IOException e) {
             logger.atError().setCause(e).log("Error occurred while processing deployment");

@@ -10,6 +10,7 @@ import com.amazon.aws.iot.greengrass.component.common.DependencyProperties;
 import com.aws.greengrass.componentmanager.ComponentStore;
 import com.aws.greengrass.componentmanager.exceptions.PackageLoadingException;
 import com.aws.greengrass.componentmanager.models.ComponentIdentifier;
+import com.aws.greengrass.deployment.model.DeploymentPackageConfiguration;
 import com.aws.greengrass.deployment.templating.exceptions.IllegalTemplateDependencyException;
 import com.aws.greengrass.deployment.templating.exceptions.IllegalTransformerException;
 import com.aws.greengrass.deployment.templating.exceptions.MultipleTemplateDependencyException;
@@ -17,6 +18,7 @@ import com.aws.greengrass.deployment.templating.exceptions.RecipeTransformerExce
 import com.aws.greengrass.deployment.templating.exceptions.TemplateExecutionException;
 import com.aws.greengrass.util.NucleusPaths;
 import com.aws.greengrass.util.Pair;
+import com.vdurmont.semver4j.Semver;
 
 import java.io.IOException;
 import java.lang.reflect.InvocationTargetException;
@@ -26,8 +28,10 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
+import javax.annotation.Nullable;
 import javax.inject.Inject;
 
 import static com.amazon.aws.iot.greengrass.component.common.SerializerFactory.getRecipeSerializer;
@@ -102,7 +106,6 @@ public class TemplateEngine {
         loadComponents();
         // TODO: resolve versioning, download dependencies if necessary
         expandAll();
-        removeTemplatesFromStore();
 
         // cleanup state
         recipes = null;
@@ -205,19 +208,43 @@ public class TemplateEngine {
         Files.copy(artifactPath, newArtifact);
     }
 
-    void removeTemplatesFromStore() throws IOException, TemplateExecutionException {
-        try (Stream<Path> files = Files.walk(recipeDirectoryPath)) {
-            for (Path r : files.collect(Collectors.toList())) {
-                if (!r.toFile().isDirectory()) {
-                    ComponentRecipe recipe = parseFile(r);
-                    if (recipe.getComponentName().endsWith("Template")) { // TODO: remove templates by component type
-                        componentStore.deleteComponent(new ComponentIdentifier(recipe.getComponentName(),
-                                recipe.getComponentVersion()));
-                    }
-                }
+    /**
+     * Scan through list of packages, removing templates from package list and keeping track of which packages were
+     * removed.
+     * @param desiredPackages the list of packages to scan through.
+     * @return a Pair where the first value is the resulting package list, less templates; and the second value is
+     *     the list of removed packages.
+     */
+    public static Pair<List<ComponentIdentifier>, List<ComponentIdentifier>> separateTemplatesFromPackageList(
+            List<ComponentIdentifier> desiredPackages) {
+        List<ComponentIdentifier> resultant = new ArrayList<>();
+        List<ComponentIdentifier> removed = new ArrayList<>();
+        desiredPackages.forEach(componentIdentifier -> {
+            // TODO: can we dig through the recipe store to check template status?
+            if (componentIdentifier.getName().endsWith("Template")) {
+                removed.add(componentIdentifier);
+            } else {
+                resultant.add(componentIdentifier);
             }
-        } catch (PackageLoadingException e) {
-            throw new TemplateExecutionException("Could not delete template component", e);
+        });
+        return new Pair<>(resultant, removed);
+    }
+
+    /**
+     * Utility function to remove templates from the list of deployment package configurations.
+     * @param deploymentPackageConfigurationList the list to scan through.
+     * @param templates a collection of components known to be templates.
+     * @return a new list with deployment packages, excluding templates.
+     */
+    public static List<DeploymentPackageConfiguration> deploymentPackageConfigurationListLessTemplates(
+            @Nullable List<DeploymentPackageConfiguration> deploymentPackageConfigurationList,
+            Set<ComponentIdentifier> templates) {
+        if (deploymentPackageConfigurationList == null) {
+            return new ArrayList<>();
         }
+        return deploymentPackageConfigurationList.stream().filter(packageConfig ->
+                !templates.contains(new ComponentIdentifier(packageConfig.getPackageName(),
+                new Semver(packageConfig.getResolvedVersion()))))
+        .collect(Collectors.toList());
     }
 }
