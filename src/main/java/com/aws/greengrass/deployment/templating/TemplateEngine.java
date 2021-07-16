@@ -204,10 +204,9 @@ public class TemplateEngine {
     // copies the artifact to the artifacts directory, if one with the same name does not already exist
     void copyArtifactToStoreIfMissing(Path artifactPath, Path componentArtifactsDirectory) throws IOException {
         Path newArtifact = componentArtifactsDirectory.resolve(artifactPath.getFileName());
-        if (Files.exists(newArtifact)) {
-            return;
+        if (!Files.exists(newArtifact)) {
+            Files.copy(artifactPath, newArtifact);
         }
-        Files.copy(artifactPath, newArtifact);
     }
 
     /**

@@ -223,7 +223,7 @@ public class ComponentStore {
      * @param compId component identifier
      * @throws PackageLoadingException if deletion of the component failed
      */
-    public void deleteComponent(@NonNull ComponentIdentifier compId) throws PackageLoadingException {
+    void deleteComponent(@NonNull ComponentIdentifier compId) throws PackageLoadingException {
         logger.atInfo("delete-component-start").kv("componentIdentifier", compId).log();
         IOException exception = null;
         // delete recipe
