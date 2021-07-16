@@ -45,16 +45,14 @@ import static com.aws.greengrass.deployment.DeploymentService.parseFile;
 public class TemplateEngine {
     public static final String PARSER_JAR = "transformer.jar";
 
-    private Path recipeDirectoryPath;
-    private Path artifactsDirectoryPath;
     @Inject
     private ComponentStore componentStore;
     @Inject
     private NucleusPaths nucleusPaths;
 
-    private Map<ComponentIdentifier, ComponentRecipe> recipes;
-    private Map<String, ComponentIdentifier> templates;
-    private Map<String, List<ComponentIdentifier>> needsToBeBuilt;
+    private Map<ComponentIdentifier, ComponentRecipe> recipes = null;
+    private Map<String, ComponentIdentifier> templates = null;
+    private Map<String, List<ComponentIdentifier>> needsToBeBuilt = null;
 
     /**
      * Constructor.
@@ -95,17 +93,14 @@ public class TemplateEngine {
     @SuppressWarnings("PMD.NullAssignment")
     public void process(Path recipeDirectoryPath, Path artifactsDirectoryPath) throws TemplateExecutionException,
             IOException, PackageLoadingException, RecipeTransformerException {
-        this.recipeDirectoryPath = recipeDirectoryPath;
-        this.artifactsDirectoryPath = artifactsDirectoryPath;
-
         // init state
         recipes = new HashMap<>();
         templates = new HashMap<>();
         needsToBeBuilt = new HashMap<>();
 
-        loadComponents();
+        loadComponents(recipeDirectoryPath);
         // TODO: resolve versioning, download dependencies if necessary
-        expandAll();
+        expandAll(artifactsDirectoryPath);
 
         // cleanup state
         recipes = null;
@@ -120,7 +115,7 @@ public class TemplateEngine {
      * @throws IllegalTemplateDependencyException   if a template declares a dependency on another template.
      * @throws IOException                          if something funky happens with I/O or de/serialization.
      */
-    void loadComponents() throws TemplateExecutionException, IOException {
+    void loadComponents(Path recipeDirectoryPath) throws TemplateExecutionException, IOException {
         try (Stream<Path> files = Files.walk(recipeDirectoryPath)) {
             for (Path r : files.collect(Collectors.toList())) {
                 if (!r.toFile().isDirectory()) {
@@ -162,25 +157,32 @@ public class TemplateEngine {
     }
 
     // process all templates and parameter files
-    void expandAll() throws PackageLoadingException, RecipeTransformerException,
+
+    /**
+     * Process all templates and parameter files.
+     * @param artifactsDirectoryPath        the artifacts path in which to find template transformer jars.
+     * @throws PackageLoadingException      if the template isn't present on the device.
+     * @throws RecipeTransformerException   if something goes wrong with template expansion.
+     * @throws IOException                  if something goes wrong with IO/serialization.
+     */
+    void expandAll(Path artifactsDirectoryPath) throws PackageLoadingException, RecipeTransformerException,
             IOException {
         for (Map.Entry<String, List<ComponentIdentifier>> entry : needsToBeBuilt.entrySet()) {
             ComponentIdentifier template = templates.get(entry.getKey());
             if (template == null) {
                 throw new PackageLoadingException("Could not get template component " + entry.getKey());
             }
-            expandAllForTemplate(template, entry.getValue());
+            Path templateJarPath = artifactsDirectoryPath.resolve(template.getName())
+                    .resolve(template.getVersion().toString()).resolve(PARSER_JAR);
+            expandAllForTemplate(template, templateJarPath, entry.getValue());
         }
     }
 
-    void expandAllForTemplate(ComponentIdentifier template, List<ComponentIdentifier> paramFiles)
+    void expandAllForTemplate(ComponentIdentifier template, Path templateJarFile, List<ComponentIdentifier> paramFiles)
             throws IOException, PackageLoadingException, RecipeTransformerException {
-        Path templateExecutablePath =
-                artifactsDirectoryPath.resolve(template.getName()).resolve(template.getVersion().toString()).resolve(
-                        PARSER_JAR);
         TransformerWrapper wrapper;
         try {
-            wrapper = new TransformerWrapper(templateExecutablePath,
+            wrapper = new TransformerWrapper(templateJarFile,
                     "com.aws.greengrass.deployment.templating.transformers.EchoTransformer",
                     recipes.get(template));
         } catch (ClassNotFoundException | IllegalTransformerException | NoSuchMethodException
