@@ -24,4 +24,4 @@ Manifests:
   - Platform:
       os: all
     Lifecycle:
-      Run: "echo This shouldn't ever run!"
+      Run: echo This shouldn't ever run!
