@@ -7,6 +7,8 @@ package com.aws.greengrass.deployment.templating;
 
 import com.amazon.aws.iot.greengrass.component.common.ComponentConfiguration;
 import com.amazon.aws.iot.greengrass.component.common.ComponentRecipe;
+import com.amazon.aws.iot.greengrass.component.common.Platform;
+import com.amazon.aws.iot.greengrass.component.common.PlatformSpecificManifest;
 import com.amazon.aws.iot.greengrass.component.common.RecipeFormatVersion;
 import com.aws.greengrass.deployment.templating.exceptions.IllegalTemplateParameterException;
 import com.aws.greengrass.deployment.templating.exceptions.MissingTemplateParameterException;
@@ -16,29 +18,67 @@ import com.aws.greengrass.deployment.templating.exceptions.TemplateParameterType
 import com.aws.greengrass.util.Pair;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.node.BooleanNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.fasterxml.jackson.databind.node.TextNode;
 import com.vdurmont.semver4j.Semver;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
-import org.mockito.MockedStatic;
 
 import java.io.IOException;
 import java.nio.file.Path;
+import java.util.Collections;
 import java.util.List;
 
 import static com.amazon.aws.iot.greengrass.component.common.SerializerFactory.getRecipeSerializer;
+import static com.aws.greengrass.deployment.templating.RecipeTransformer.TEMPLATE_DEFAULT_PARAMETER_KEY;
+import static com.aws.greengrass.deployment.templating.RecipeTransformer.TEMPLATE_PARAMETER_SCHEMA_KEY;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.mockStatic;
-import static org.mockito.Mockito.times;
-import static org.mockito.Mockito.verify;
 
 public class RecipeTransformerTest {
     private RecipeTransformer recipeTransformer;
 
+    /*
+      stringParam:
+        type: string
+        required: true
+      booleanParam:
+        type: boolean
+        required: true
+      numberParam:
+        type: number
+        required: false
+      objectParam:
+        type: object
+        required: false
+      arrayParam:
+        type: array
+        required: false
+     */
     static String TEMPLATE_SCHEMA = "stringParam:\n" + "  type: string\n" + "  required: true\n" + "booleanParam:\n"
             + "  type: boolean\n" + "  required: true\n" + "numberParam:\n" + "  type: number\n" + "  required: false\n"
             + "objectParam:\n" + "  type: object\n" + "  required: false\n" + "arrayParam:\n" + "  type: array\n"
             + "  required: false\n";
+
+    /*
+      stringParam: unnecessary string
+      numberParam: 42069
+      objectParam:
+        key1: val1
+        key2:
+          subkey1: subval2
+          subkey2: subval2
+      arrayParam:
+        - 1
+        - 2
+        - red
+        - blue
+     */
+    static String TEMPLATE_DEFAULT_PARAMS = "stringParam: unnecessary string\n" + "numberParam: 42069\n"
+            + "objectParam:\n" + "  key1: val1\n" + "  key2:\n" + "    subkey1: subval2\n" + "    subkey2: subval2\n"
+            + "arrayParam:\n" + "  - 1\n" + "  - 2\n" + "  - red\n" + "  - blue";
+
     static String VALID_INPUT_DEFAULT_PARAMS = "stringParam: unnecessary string\n" + "numberParam: 42069\n"
             + "objectParam:\n" + "  key1: val1\n" + "  key2:\n" + "    subkey1: subval2\n" + "    subkey2: subval2\n"
             + "arrayParam:\n" + "  - 1\n" + "  - 2\n" + "  - red\n" + "  - blue";
@@ -46,45 +86,63 @@ public class RecipeTransformerTest {
             + "  key2:\n" + "    subkey1: subval2\n" + "    subkey2: subval2\n" + "arrayParam:\n" + "  - 1\n"
             + "  - 2\n" + "  - red\n" + "  - blue";
 
+    static JsonNode defaultTemplateSchema;
+    static JsonNode defaultTemplateDefaultParams;
+
+    @BeforeAll
+    static void beforeAll() throws JsonProcessingException {
+        defaultTemplateSchema = getRecipeSerializer().readTree(TEMPLATE_SCHEMA);
+        defaultTemplateDefaultParams = getRecipeSerializer().readTree(TEMPLATE_DEFAULT_PARAMS);
+    }
+
     @Test
     void IF_template_config_is_acceptable_THEN_it_works() throws IOException, TemplateParameterException {
         // no KVs generated for non-optional fields
-        recipeTransformer = new FakeRecipeTransformer(getRecipeResource("fakeTransformerTemplate.yaml"));
+        recipeTransformer = new FakeRecipeTransformer(getTemplate(defaultTemplateSchema, defaultTemplateDefaultParams));
 
         JsonNode effectiveDefaultParams = getRecipeSerializer().readTree(VALID_EFFECTIVE_DEFAULT_PARAMS);
         assertEquals(effectiveDefaultParams, recipeTransformer.getEffectiveDefaultConfig());
     }
 
     @Test
-    void IF_template_config_has_invalid_schema_THEN_throw_error() {
+    void IF_template_config_has_invalid_schema_THEN_throw_error() throws JsonProcessingException {
         // schema is missing
-        assertThrows(TemplateParameterException.class, () -> new FakeRecipeTransformer(getRecipeResource(
-                "missingFakeTransformerTemplate.yaml")));
+        assertThrows(TemplateParameterException.class, () ->
+                new FakeRecipeTransformer(getTemplate(null, defaultTemplateDefaultParams)));
 
         // schema is different
-        assertThrows(TemplateParameterException.class, () -> new FakeRecipeTransformer(getRecipeResource(
-                "differentFakeTransformerTemplate.yaml")));
+        ObjectNode stringParamNotRequired = defaultTemplateSchema.deepCopy();
+        stringParamNotRequired.replace("stringParam",
+                getRecipeSerializer().readTree("type: string\nrequired: false"));
+        assertThrows(TemplateParameterException.class, () ->
+                new FakeRecipeTransformer(getTemplate(stringParamNotRequired, defaultTemplateDefaultParams)));
     }
 
     @Test
     void IF_template_config_default_values_are_invalid_THEN_throw_error() {
         // missing value for optional parameter
-        assertThrows(MissingTemplateParameterException.class, () -> new FakeRecipeTransformer(getRecipeResource(
-                "missingOptionalFakeTransformerTemplate.yaml")));
+        ObjectNode missingArrayDefault = defaultTemplateDefaultParams.deepCopy();
+        missingArrayDefault.remove("arrayParam");
+        assertThrows(MissingTemplateParameterException.class, () ->
+                new FakeRecipeTransformer(getTemplate(defaultTemplateSchema, missingArrayDefault)));
 
         // value doesn't match schema
-        assertThrows(TemplateParameterTypeMismatchException.class, () -> new FakeRecipeTransformer(getRecipeResource(
-                "schemaMismatchFakeTransformerTemplate.yaml")));
+        ObjectNode arrayisBoolean = defaultTemplateDefaultParams.deepCopy();
+        arrayisBoolean.replace("arrayParam", BooleanNode.valueOf(false));
+        assertThrows(TemplateParameterTypeMismatchException.class, () ->
+                new FakeRecipeTransformer(getTemplate(defaultTemplateSchema, arrayisBoolean)));
 
         // extra values in template file
-        assertThrows(IllegalTemplateParameterException.class, () -> new FakeRecipeTransformer(getRecipeResource(
-                "extraParamFakeTransformerTemplate.yaml")));
+        ObjectNode extraParam = defaultTemplateDefaultParams.deepCopy();
+        extraParam.set("extraParam", new TextNode("uh oh!"));
+        assertThrows(IllegalTemplateParameterException.class, () ->
+                new FakeRecipeTransformer(getTemplate(defaultTemplateSchema, extraParam)));
     }
 
     @Test
     void GIVEN_template_config_read_in_WHEN_provided_invalid_parameters_THEN_throw_error()
             throws IOException, TemplateParameterException {
-        recipeTransformer = new FakeRecipeTransformer(getRecipeResource("fakeTransformerTemplate.yaml"));
+        recipeTransformer = new FakeRecipeTransformer(getTemplate(defaultTemplateSchema, defaultTemplateDefaultParams));
 
         // missing parameter
         String missingBoolean = "stringParam: a string\n" + "numberParam: 42068";
@@ -106,7 +164,7 @@ public class RecipeTransformerTest {
     @Test
     void GIVEN_template_config_read_in_WHEN_provided_component_configs_THEN_they_are_merged()
             throws IOException, TemplateParameterException, RecipeTransformerException {
-        recipeTransformer = new FakeRecipeTransformer(getRecipeResource("fakeTransformerTemplate.yaml"));
+        recipeTransformer = new FakeRecipeTransformer(getTemplate(defaultTemplateSchema, defaultTemplateDefaultParams));
         String goodConfig = "stringParam: a string\n" + "booleanParam: true\n" + "numberParam: 42068";
         ComponentRecipe goodRecipe = getParameterFileWithParams(goodConfig);
         JsonNode actual = extractDefaultConfig(recipeTransformer.execute(goodRecipe).getLeft());
@@ -128,8 +186,7 @@ public class RecipeTransformerTest {
                 .componentVersion(new Semver("1.0.0"))
                 .componentConfiguration(null)
                 .build();
-        RecipeTransformer recipeTransformer = new FakeRecipeTransformer(getRecipeResource("fakeTransformerTemplate"
-                + ".yaml"));
+        RecipeTransformer recipeTransformer = new FakeRecipeTransformer(getTemplate(defaultTemplateSchema, defaultTemplateDefaultParams));
         // TODO: break out schema violations into a separate exception from RecipeTransformerException
         assertThrows(RecipeTransformerException.class, () -> recipeTransformer.execute(nullConfig));
 
@@ -158,12 +215,26 @@ public class RecipeTransformerTest {
                 + "    Subkey2: subval2\n" + "arrayParam:\n" + "  - 1\n" + "  - 2\n" + "  - red\n" + "  - blue";
         ComponentRecipe differentCapRecipe = getParameterFileWithParams(differentCap);
         actual = extractDefaultConfig(recipeTransformer.execute(differentCapRecipe).getLeft());
-        expected = getRecipeSerializer().readTree(differentCap);
+        expectedString = "stringParam: a string\n" + "booleanParam: true\n" + "numberParam: 42068\n" // numberParam diff
+                + "objectParam:\n" + "  key1: val1\n" + "  key2:\n" + "    Subkey1: newSubval2\n"
+                + "    Subkey2: subval2\n" + "arrayParam:\n" + "  - 1\n" + "  - 2\n" + "  - red\n" + "  - blue";
+        expected = getRecipeSerializer().readTree(expectedString);
         assertEquals(expected, actual);
     }
 
-    ComponentRecipe getRecipeResource(String fileName) throws IOException {
-        return getRecipeSerializer().readValue(getClass().getResource(fileName), ComponentRecipe.class);
+    ComponentRecipe getTemplate(JsonNode schema, JsonNode parameters) {
+        ObjectNode defaultConfig = getRecipeSerializer().createObjectNode();
+        if (schema != null) defaultConfig.set(TEMPLATE_PARAMETER_SCHEMA_KEY, schema);
+        if (parameters != null) defaultConfig.set(TEMPLATE_DEFAULT_PARAMETER_KEY, parameters);
+        PlatformSpecificManifest manifest =
+                PlatformSpecificManifest.builder().platform(Platform.builder().os(Platform.OS.ALL).build()).build();
+        return ComponentRecipe.builder()
+                .recipeFormatVersion(RecipeFormatVersion.JAN_25_2020)
+                .componentName("FakeTransformerTemplate")
+                .componentVersion(new Semver("1.0.0"))
+                .componentConfiguration(new ComponentConfiguration(defaultConfig))
+                .manifests(Collections.singletonList(manifest))
+                .build();
     }
 
     // parameter file with minimal boilerplate
@@ -199,8 +270,12 @@ public class RecipeTransformerTest {
         public Pair<ComponentRecipe, List<Path>> transform(ComponentRecipe paramFile, JsonNode componentParams)
                 throws RecipeTransformerException {
             // just wrap the componentParams for checking
-            ComponentRecipe wrapperRecipe = ComponentRecipe.builder().componentConfiguration(
-                    ComponentConfiguration.builder().defaultConfiguration(componentParams).build()).build();
+            ComponentRecipe wrapperRecipe = ComponentRecipe.builder()
+                    .recipeFormatVersion(RecipeFormatVersion.JAN_25_2020)
+                    .componentName("A")
+                    .componentVersion(new Semver("1.0.0"))
+                    .componentConfiguration(new ComponentConfiguration(componentParams))
+                    .build();
             return new Pair<>(wrapperRecipe, null);
         }
     }

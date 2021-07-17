@@ -5,6 +5,7 @@
 
 package com.aws.greengrass.deployment.templating;
 
+import com.amazon.aws.iot.greengrass.component.common.ComponentConfiguration;
 import com.amazon.aws.iot.greengrass.component.common.ComponentRecipe;
 import com.aws.greengrass.deployment.templating.exceptions.IllegalTemplateParameterException;
 import com.aws.greengrass.deployment.templating.exceptions.MissingTemplateParameterException;
@@ -151,8 +152,12 @@ public abstract class RecipeTransformer {
 
     protected JsonNode mergeAndValidateComponentParams(ComponentRecipe paramFile)
             throws RecipeTransformerException {
-        JsonNode paramNode = paramFile.getComponentConfiguration().getDefaultConfiguration();
-        JsonNode mergedParams = mergeParams(effectiveDefaultConfig, paramNode).get();
+        ComponentConfiguration componentConfiguration = paramFile.getComponentConfiguration();
+        JsonNode paramNode = getRecipeSerializer().createObjectNode();
+        if (componentConfiguration != null && componentConfiguration.getDefaultConfiguration() != null) {
+            paramNode = componentConfiguration.getDefaultConfiguration();
+        }
+        JsonNode mergedParams = mergeParams(effectiveDefaultConfig, paramNode);
         try {
             validateParams(mergedParams);
         } catch (TemplateParameterException e) {
@@ -175,8 +180,9 @@ public abstract class RecipeTransformer {
             }
             JsonNodeType paramType = params.get(field).getNodeType();
             if (nodeType(templateSchema.get(field).get(TEMPLATE_FIELD_TYPE_KEY).asText()) != paramType) {
-                throw new TemplateParameterTypeMismatchException("Provided parameter does not satisfy template schema. "
-                        + "Expected " + nodeType(templateSchema.get(field).get(TEMPLATE_FIELD_TYPE_KEY).asText())
+                throw new TemplateParameterTypeMismatchException("Provided parameter " + field
+                        + " does not satisfy template schema. Expected "
+                        + nodeType(templateSchema.get(field).get(TEMPLATE_FIELD_TYPE_KEY).asText())
                         + " but got " + paramType);
             }
         }
@@ -190,12 +196,9 @@ public abstract class RecipeTransformer {
     }
 
     // merge default-provided parameters into custom component specifications (custom takes precedence)
-    static Optional<JsonNode> mergeParams(@Nullable JsonNode defaultVal, @Nullable JsonNode customVal) {
-        if (defaultVal == null) {
-            return Optional.ofNullable(customVal);
-        }
+    static JsonNode mergeParams(JsonNode defaultVal, @Nullable JsonNode customVal) {
         if (customVal == null) {
-            return Optional.of(defaultVal);
+            return defaultVal;
         }
 
         JsonNode retval = customVal.deepCopy();
@@ -203,12 +206,13 @@ public abstract class RecipeTransformer {
         while (fieldNames.hasNext()) {
             String fieldName = fieldNames.next();
             if (hasTitleInsensitive(customVal, fieldName)) { // TODO: how do we resolve field capitalization???
-                ((ObjectNode)retval).set(fieldName, customVal.get(fieldName)); // non-recursive
+                removeTitleInsensitive((ObjectNode)retval, fieldName);
+                ((ObjectNode)retval).set(fieldName, getTitleInsensitive(customVal, fieldName)); // non-recursive
             } else {
                 ((ObjectNode)retval).set(fieldName, defaultVal.get(fieldName));
             }
         }
-        return Optional.of(retval);
+        return retval;
     }
 
     // equivalent to asking for both "fieldName" and "FieldName".
@@ -230,7 +234,26 @@ public abstract class RecipeTransformer {
         return node.get(inverseCaseFieldName);
     }
 
-    // similar, but for has instead of get
+    // similar, but remove instead of get. note it has the same contract as remove; that is, if field doesn't exist,
+    // return null.
+    protected static JsonNode removeTitleInsensitive(ObjectNode node, String fieldName) {
+        if (node.has(fieldName)) {
+            return node.remove(fieldName);
+        }
+        char inverseCaseFirstChar;
+        if (Character.isUpperCase(fieldName.charAt(0))) {
+            inverseCaseFirstChar = Character.toLowerCase(fieldName.charAt(0));
+        } else {
+            inverseCaseFirstChar = Character.toUpperCase(fieldName.charAt(0));
+        }
+        String inverseCaseFieldName = inverseCaseFirstChar + fieldName.substring(1);
+        if (node.has(inverseCaseFieldName)) {
+            return node.remove(inverseCaseFieldName);
+        }
+        return null;
+    }
+
+    // similar, but for has instead of remove.
     protected static boolean hasTitleInsensitive(JsonNode node, String fieldName) {
         if (node.has(fieldName)) {
             return true;
