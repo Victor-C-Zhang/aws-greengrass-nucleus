@@ -1,0 +1,41 @@
+---
+recipeFormatVersion: '2020-01-25'
+componentName: FakeTransformerTemplate
+componentVersion: '1.0.0'
+componentDescription: Template file for RecipeTransformerTest.IF_template_config_is_acceptable_THEN_it_works
+componentConfiguration:
+  defaultConfiguration:
+    parameters:
+      stringParam: unnecessary string
+      numberParam: 42069
+      objectParam:
+        key1: val1
+        key2:
+          subkey1: subval2
+          subkey2: subval2
+      arrayParam:
+        - 1
+        - 2
+        - red
+        - blue
+    parameterSchema:
+      stringParam:
+        type: string
+        required: true
+      booleanParam:
+        type: boolean
+        required: true
+      numberParam:
+        type: number
+        required: false
+      objectParam:
+        type: object
+        required: false
+      arrayParam:
+        type: array
+        required: false
+Manifests:
+  - Platform:
+      os: all
+    Lifecycle:
+      Run: "echo This shouldn't ever run!"

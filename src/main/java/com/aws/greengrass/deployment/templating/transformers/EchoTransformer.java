@@ -7,6 +7,8 @@ package com.aws.greengrass.deployment.templating.transformers;
 
 import com.amazon.aws.iot.greengrass.component.common.ComponentRecipe;
 import com.amazon.aws.iot.greengrass.component.common.ComponentType;
+import com.amazon.aws.iot.greengrass.component.common.Platform;
+import com.amazon.aws.iot.greengrass.component.common.PlatformSpecificManifest;
 import com.amazon.aws.iot.greengrass.component.common.RecipeFormatVersion;
 import com.aws.greengrass.deployment.templating.RecipeTransformer;
 import com.aws.greengrass.deployment.templating.exceptions.TemplateParameterException;
@@ -16,6 +18,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -61,6 +64,10 @@ public class EchoTransformer extends RecipeTransformer {
                 + componentConfig.get("resetParam2").asText();
         newLifecyle.put("run", runString);
 
+        PlatformSpecificManifest manifest =
+                PlatformSpecificManifest.builder().lifecycle(newLifecyle).platform(
+                        Platform.builder().os(Platform.OS.ALL).build()).build();
+
         ComponentRecipe newRecipe = ComponentRecipe.builder()
                 .recipeFormatVersion(RecipeFormatVersion.JAN_25_2020)
                 .componentName(paramFile.getComponentName())
@@ -68,8 +75,9 @@ public class EchoTransformer extends RecipeTransformer {
                 .componentDescription(COMPONENT_DESCRIPTION)
                 .componentPublisher(COMPONENT_PUBLISHER)
                 .componentType(ComponentType.GENERIC)
-                .lifecycle(newLifecyle)
+                .manifests(Collections.singletonList(manifest))
                 .build();
+
         List<Path> artifactsToCopy = new ArrayList<>();
         return new Pair<>(newRecipe, artifactsToCopy);
     }

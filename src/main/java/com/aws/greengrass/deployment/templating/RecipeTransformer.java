@@ -16,6 +16,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.JsonNodeType;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import lombok.Getter;
 
 import java.nio.file.Path;
 import java.util.Iterator;
@@ -48,6 +49,7 @@ public abstract class RecipeTransformer {
     public static final ObjectMapper RECIPE_SERIALIZER = getRecipeSerializer();
 
     private final JsonNode templateSchema;
+    @Getter // for unit testing
     private JsonNode effectiveDefaultConfig;
 
     /**
@@ -56,9 +58,9 @@ public abstract class RecipeTransformer {
      * @param templateRecipe to extract default params, param schema.
      * @throws TemplateParameterException if the template recipe or custom config is malformed.
      */
-    public RecipeTransformer(ComponentRecipe templateRecipe)
-            throws TemplateParameterException {
-        templateSchema = initTemplateSchema();
+    public RecipeTransformer(ComponentRecipe templateRecipe) throws TemplateParameterException {
+        JsonNode temp = initTemplateSchema();
+        templateSchema = (temp == null) ? getRecipeSerializer().createObjectNode() : temp;
         templateConfig(templateRecipe.getComponentConfiguration().getDefaultConfiguration());
     }
 
@@ -113,6 +115,10 @@ public abstract class RecipeTransformer {
 
         // validate hard-coded/user-provided "default configs"
         JsonNode defaultNode = defaultConfig.get(TEMPLATE_DEFAULT_PARAMETER_KEY);
+        if (defaultNode == null) {
+            defaultNode = getRecipeSerializer().createObjectNode();
+        }
+
         // check both ways
         for (Iterator<String> it = templateSchema.fieldNames(); it.hasNext(); ) {
             String field = it.next();
@@ -184,7 +190,7 @@ public abstract class RecipeTransformer {
     }
 
     // merge default-provided parameters into custom component specifications (custom takes precedence)
-    protected static Optional<JsonNode> mergeParams(@Nullable JsonNode defaultVal, @Nullable JsonNode customVal) {
+    static Optional<JsonNode> mergeParams(@Nullable JsonNode defaultVal, @Nullable JsonNode customVal) {
         if (defaultVal == null) {
             return Optional.ofNullable(customVal);
         }

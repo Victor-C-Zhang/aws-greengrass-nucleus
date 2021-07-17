@@ -81,7 +81,7 @@ class TemplateEngineTest extends BaseITCase {
         kernel.getContext().put(DeploymentDocumentDownloader.class, deploymentDocumentDownloader);
         NoOpPathOwnershipHandler.register(kernel);
         ConfigPlatformResolver.initKernelWithMultiPlatformConfig(kernel,
-                TemplateEngineTest.class.getResource("onlyMain.yaml"));
+                TemplateEngineTest.class.getResource("../onlyMain.yaml"));
 
         // ensure deployment service starts
         CountDownLatch deploymentServiceLatch = new CountDownLatch(1);
@@ -101,7 +101,7 @@ class TemplateEngineTest extends BaseITCase {
         fleetStatusService.getIsConnected().set(false);
         // pre-load contents to package store
         localStoreContentPath =
-                Paths.get(TemplateEngineTest.class.getResource("templating").toURI());
+                Paths.get(TemplateEngineTest.class.getResource(".").toURI());
         PreloadComponentStoreHelper.preloadRecipesFromTestResourceDir(localStoreContentPath.resolve("recipes"),
                 kernel.getNucleusPaths().recipePath());
         copyFolderRecursively(localStoreContentPath.resolve("artifacts"), kernel.getNucleusPaths().artifactPath(),
