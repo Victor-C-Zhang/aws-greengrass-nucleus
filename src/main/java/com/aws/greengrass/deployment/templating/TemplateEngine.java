@@ -18,6 +18,7 @@ import com.aws.greengrass.deployment.templating.exceptions.RecipeTransformerExce
 import com.aws.greengrass.deployment.templating.exceptions.TemplateExecutionException;
 import com.aws.greengrass.util.NucleusPaths;
 import com.aws.greengrass.util.Pair;
+import com.fasterxml.jackson.databind.JsonNode;
 import com.vdurmont.semver4j.Semver;
 
 import java.io.IOException;
@@ -36,6 +37,7 @@ import javax.inject.Inject;
 
 import static com.amazon.aws.iot.greengrass.component.common.SerializerFactory.getRecipeSerializer;
 import static com.aws.greengrass.deployment.DeploymentService.parseFile;
+import static com.aws.greengrass.deployment.templating.RecipeTransformer.TEMPLATE_TRANSFORMER_CLASS_KEY;
 
 /**
  * Template expansion workflow. Assumes the deployment is local and has all the required components/dependencies
@@ -165,8 +167,8 @@ public class TemplateEngine {
      * @throws RecipeTransformerException   if something goes wrong with template expansion.
      * @throws IOException                  if something goes wrong with IO/serialization.
      */
-    void expandAll(Path artifactsDirectoryPath) throws PackageLoadingException, RecipeTransformerException,
-            IOException {
+    void expandAll(Path artifactsDirectoryPath)
+            throws PackageLoadingException, RecipeTransformerException, IOException {
         for (Map.Entry<String, List<ComponentIdentifier>> entry : needsToBeBuilt.entrySet()) {
             ComponentIdentifier template = templates.get(entry.getKey());
             if (template == null) {
@@ -182,9 +184,12 @@ public class TemplateEngine {
             throws IOException, PackageLoadingException, RecipeTransformerException {
         TransformerWrapper wrapper;
         try {
-            wrapper = new TransformerWrapper(templateJarFile,
-                    "com.aws.greengrass.deployment.templating.transformers.EchoTransformer",
-                    recipes.get(template));
+            JsonNode transformerClassNode = recipes.get(template).getComponentConfiguration().getDefaultConfiguration()
+                    .get(TEMPLATE_TRANSFORMER_CLASS_KEY);
+            if (transformerClassNode == null) {
+                throw new RecipeTransformerException("Template recipe did not specify a transformer class");
+            }
+            wrapper = new TransformerWrapper(templateJarFile, transformerClassNode.asText(), recipes.get(template));
         } catch (ClassNotFoundException | IllegalTransformerException | NoSuchMethodException
                 | InvocationTargetException | InstantiationException | IllegalAccessException e) {
             throw new RecipeTransformerException("Could not instantiate the transformer for template "

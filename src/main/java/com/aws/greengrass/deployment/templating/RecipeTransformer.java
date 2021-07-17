@@ -40,6 +40,7 @@ public abstract class RecipeTransformer {
     public static final String NULL_TYPE = "null";
 
     // TODO: should this be declared in an extension class to ComponentRecipe?
+    public static final String TEMPLATE_TRANSFORMER_CLASS_KEY = "transformerClass";
     public static final String TEMPLATE_PARAMETER_SCHEMA_KEY = "parameterSchema";
     public static final String TEMPLATE_DEFAULT_PARAMETER_KEY = "parameters";
     public static final String TEMPLATE_FIELD_REQUIRED_KEY = "required";
