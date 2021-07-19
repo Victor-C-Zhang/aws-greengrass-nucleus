@@ -505,6 +505,7 @@ public class DeploymentService extends GreengrassService {
         } catch (TemplateExecutionException | PackageLoadingException | IOException | RecipeTransformerException e) {
             logger.atError().log("Error expanding templates", e);
             updateDeploymentResultAsFailed(deployment, deploymentTask, false, e);
+            return;
         }
 
 

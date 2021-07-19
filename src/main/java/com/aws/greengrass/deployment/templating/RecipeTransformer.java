@@ -20,7 +20,6 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.nio.file.Path;
 import java.util.Iterator;
 import java.util.List;
-import java.util.Locale;
 import java.util.Optional;
 import javax.annotation.Nullable;
 
@@ -32,21 +31,20 @@ import static com.amazon.aws.iot.greengrass.component.common.SerializerFactory.g
  */
 public abstract class RecipeTransformer {
     // valid json data types
-    public static final String STRING_TYPE = "string";
-    public static final String NUMBER_TYPE = "number";
-    public static final String OBJECT_TYPE = "object";
-    public static final String ARRAY_TYPE = "array";
-    public static final String BOOLEAN_TYPE = "boolean";
-    public static final String NULL_TYPE = "null";
+    private static final String STRING_TYPE = "string";
+    private static final String NUMBER_TYPE = "number";
+    private static final String OBJECT_TYPE = "object";
+    private static final String ARRAY_TYPE = "array";
+    private static final String BOOLEAN_TYPE = "boolean";
+    private static final String NULL_TYPE = "null";
 
     // TODO: should this be declared in an extension class to ComponentRecipe?
-    public static final String TEMPLATE_TRANSFORMER_CLASS_KEY = "transformerClass";
-    public static final String TEMPLATE_PARAMETER_SCHEMA_KEY = "parameterSchema";
-    public static final String TEMPLATE_DEFAULT_PARAMETER_KEY = "parameters";
-    public static final String TEMPLATE_FIELD_REQUIRED_KEY = "required";
-    public static final String TEMPLATE_FIELD_TYPE_KEY = "type";
+    static final String TEMPLATE_PARAMETER_SCHEMA_KEY = "parameterSchema";
+    static final String TEMPLATE_DEFAULT_PARAMETER_KEY = "parameters";
+    static final String TEMPLATE_FIELD_REQUIRED_KEY = "required";
+    static final String TEMPLATE_FIELD_TYPE_KEY = "type";
 
-    public static final ObjectMapper RECIPE_SERIALIZER = getRecipeSerializer();
+    protected static final ObjectMapper RECIPE_SERIALIZER = getRecipeSerializer();
 
     private final JsonNode templateSchema;
     private JsonNode effectiveDefaultConfig;
@@ -215,14 +213,7 @@ public abstract class RecipeTransformer {
         if (node.has(fieldName)) {
             return node.get(fieldName);
         }
-        char inverseCaseFirstChar;
-        if (Character.isUpperCase(fieldName.charAt(0))) {
-            inverseCaseFirstChar = Character.toLowerCase(fieldName.charAt(0));
-        } else {
-            inverseCaseFirstChar = Character.toUpperCase(fieldName.charAt(0));
-        }
-        String inverseCaseFieldName = inverseCaseFirstChar + fieldName.substring(1);
-        return node.get(inverseCaseFieldName);
+        return node.get(invertCase(fieldName));
     }
 
     // similar, but for has instead of get
@@ -230,19 +221,23 @@ public abstract class RecipeTransformer {
         if (node.has(fieldName)) {
             return true;
         }
+        return node.has(invertCase(fieldName));
+    }
+
+    // invert the case of the first character in a string
+    protected static String invertCase(String camelCaseString) {
         char inverseCaseFirstChar;
-        if (Character.isUpperCase(fieldName.charAt(0))) {
-            inverseCaseFirstChar = Character.toLowerCase(fieldName.charAt(0));
+        if (Character.isUpperCase(camelCaseString.charAt(0))) {
+            inverseCaseFirstChar = Character.toLowerCase(camelCaseString.charAt(0));
         } else {
-            inverseCaseFirstChar = Character.toUpperCase(fieldName.charAt(0));
+            inverseCaseFirstChar = Character.toUpperCase(camelCaseString.charAt(0));
         }
-        String inverseCaseFieldName = inverseCaseFirstChar + fieldName.substring(1);
-        return node.has(inverseCaseFieldName);
+        return inverseCaseFirstChar + camelCaseString.substring(1);
     }
 
     // Utility to get the node type from a string. Useful when parsing type from JSON.
     protected static JsonNodeType nodeType(String typeString) {
-        String lowercased = typeString.toLowerCase(Locale.ROOT);
+        String lowercased = typeString.toLowerCase();
         switch (lowercased) {
             case STRING_TYPE: return JsonNodeType.STRING;
             case NUMBER_TYPE: return JsonNodeType.NUMBER;

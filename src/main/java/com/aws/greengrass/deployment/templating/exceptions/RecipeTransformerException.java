@@ -12,6 +12,10 @@ public class RecipeTransformerException extends Exception {
         super(message);
     }
 
+    public RecipeTransformerException(Throwable e) {
+        super(e);
+    }
+
     public RecipeTransformerException(String message, Throwable e) {
         super(message, e);
     }

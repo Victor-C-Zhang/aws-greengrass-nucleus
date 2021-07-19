@@ -10,19 +10,17 @@ import com.amazon.aws.iot.greengrass.component.common.DependencyProperties;
 import com.aws.greengrass.componentmanager.ComponentStore;
 import com.aws.greengrass.componentmanager.exceptions.PackageLoadingException;
 import com.aws.greengrass.componentmanager.models.ComponentIdentifier;
+import com.aws.greengrass.dependency.EZPlugins;
 import com.aws.greengrass.deployment.model.DeploymentPackageConfiguration;
 import com.aws.greengrass.deployment.templating.exceptions.IllegalTemplateDependencyException;
-import com.aws.greengrass.deployment.templating.exceptions.IllegalTransformerException;
 import com.aws.greengrass.deployment.templating.exceptions.MultipleTemplateDependencyException;
 import com.aws.greengrass.deployment.templating.exceptions.RecipeTransformerException;
 import com.aws.greengrass.deployment.templating.exceptions.TemplateExecutionException;
 import com.aws.greengrass.util.NucleusPaths;
 import com.aws.greengrass.util.Pair;
-import com.fasterxml.jackson.databind.JsonNode;
 import com.vdurmont.semver4j.Semver;
 
 import java.io.IOException;
-import java.lang.reflect.InvocationTargetException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -37,7 +35,6 @@ import javax.inject.Inject;
 
 import static com.amazon.aws.iot.greengrass.component.common.SerializerFactory.getRecipeSerializer;
 import static com.aws.greengrass.deployment.DeploymentService.parseFile;
-import static com.aws.greengrass.deployment.templating.RecipeTransformer.TEMPLATE_TRANSFORMER_CLASS_KEY;
 
 /**
  * Template expansion workflow. Assumes the deployment is local and has all the required components/dependencies
@@ -46,11 +43,14 @@ import static com.aws.greengrass.deployment.templating.RecipeTransformer.TEMPLAT
  */
 public class TemplateEngine {
     public static final String PARSER_JAR = "transformer.jar";
+    private static final String TEMPLATE_TEMP_IDENTIFIER = "Template"; // TODO: get rid of this once template type is in
 
     @Inject
     private ComponentStore componentStore;
     @Inject
     private NucleusPaths nucleusPaths;
+    @Inject
+    EZPlugins ezPlugins;
 
     private Map<ComponentIdentifier, ComponentRecipe> recipes = null;
     private Map<String, ComponentIdentifier> templates = null;
@@ -133,7 +133,7 @@ public class TemplateEngine {
         ComponentIdentifier identifier = new ComponentIdentifier(recipe.getComponentName(),
                 recipe.getComponentVersion());
         recipes.put(identifier, recipe);
-        if (recipe.getComponentName().endsWith("Template")) { // TODO: same as above
+        if (recipe.getComponentName().endsWith(TEMPLATE_TEMP_IDENTIFIER)) { // TODO: same as above
             templates.put(recipe.getComponentName(), identifier);
         }
         Map<String, DependencyProperties> deps = recipe.getComponentDependencies();
@@ -142,8 +142,8 @@ public class TemplateEngine {
         }
         boolean paramFileAlreadyHasDependency = false;
         for (Map.Entry<String, DependencyProperties> me : deps.entrySet()) {
-            if (me.getKey().endsWith("Template")) { // TODO: same as above
-                if (identifier.getName().endsWith("Template")) { // TODO: here too
+            if (me.getKey().endsWith(TEMPLATE_TEMP_IDENTIFIER)) { // TODO: same as above
+                if (identifier.getName().endsWith(TEMPLATE_TEMP_IDENTIFIER)) { // TODO: here too
                     throw new IllegalTemplateDependencyException("Illegal dependency for template "
                             + identifier.getName() + ". Templates cannot depend on other templates");
                 }
@@ -183,18 +183,7 @@ public class TemplateEngine {
     void expandAllForTemplate(ComponentIdentifier template, Path templateJarFile, List<ComponentIdentifier> paramFiles)
             throws IOException, PackageLoadingException, RecipeTransformerException {
         TransformerWrapper wrapper;
-        try {
-            JsonNode transformerClassNode = recipes.get(template).getComponentConfiguration().getDefaultConfiguration()
-                    .get(TEMPLATE_TRANSFORMER_CLASS_KEY);
-            if (transformerClassNode == null) {
-                throw new RecipeTransformerException("Template recipe did not specify a transformer class");
-            }
-            wrapper = new TransformerWrapper(templateJarFile, transformerClassNode.asText(), recipes.get(template));
-        } catch (ClassNotFoundException | IllegalTransformerException | NoSuchMethodException
-                | InvocationTargetException | InstantiationException | IllegalAccessException e) {
-            throw new RecipeTransformerException("Could not instantiate the transformer for template "
-                    + template.getName(), e);
-        }
+         wrapper = new TransformerWrapper(templateJarFile, recipes.get(template), ezPlugins);
         for (ComponentIdentifier paramFile : paramFiles) {
             Pair<ComponentRecipe, List<Path>> rt =
                     wrapper.expandOne(recipes.get(paramFile));
@@ -227,7 +216,7 @@ public class TemplateEngine {
         List<ComponentIdentifier> removed = new ArrayList<>();
         desiredPackages.forEach(componentIdentifier -> {
             // TODO: can we dig through the recipe store to check template status?
-            if (componentIdentifier.getName().endsWith("Template")) {
+            if (componentIdentifier.getName().endsWith(TEMPLATE_TEMP_IDENTIFIER)) {
                 removed.add(componentIdentifier);
             } else {
                 resultant.add(componentIdentifier);
