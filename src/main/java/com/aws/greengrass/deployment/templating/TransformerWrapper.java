@@ -8,19 +8,13 @@ package com.aws.greengrass.deployment.templating;
 import com.amazon.aws.iot.greengrass.component.common.ComponentRecipe;
 import com.aws.greengrass.dependency.EZPlugins;
 import com.aws.greengrass.deployment.templating.exceptions.RecipeTransformerException;
-import com.aws.greengrass.logging.api.Logger;
-import com.aws.greengrass.util.Pair;
 
 import java.io.IOException;
 import java.lang.reflect.InvocationTargetException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.List;
-import javax.inject.Inject;
 
 public class TransformerWrapper {
-    @Inject
-    Logger logger;
     RecipeTransformer transformer = null;
 
     /**
@@ -37,16 +31,14 @@ public class TransformerWrapper {
             throw new RecipeTransformerException("Could not find template parsing jar to execute");
         }
         try {
-            ezPlugins.loadPlugin(pathToExecutable, sc -> {
-                sc.matchSubclassesOf(RecipeTransformer.class, c -> {
-                    try {
-                        transformer = c.getDeclaredConstructor(ComponentRecipe.class).newInstance(template);
-                    } catch (InstantiationException | IllegalAccessException | NoSuchMethodException
-                            | InvocationTargetException e) {
-                        throw new RuntimeException(e);
-                    }
-                });
-            });
+            ezPlugins.loadPlugin(pathToExecutable, sc -> sc.matchSubclassesOf(RecipeTransformer.class, c -> {
+                try {
+                    transformer = c.getDeclaredConstructor(ComponentRecipe.class).newInstance(template);
+                } catch (InstantiationException | IllegalAccessException | NoSuchMethodException
+                        | InvocationTargetException e) {
+                    throw new RuntimeException(e);
+                }
+            }));
         } catch (IOException | RuntimeException e) {
             throw new RecipeTransformerException("Could not instantiate the transformer for "
                     + template.getComponentName(), e);
@@ -56,10 +48,9 @@ public class TransformerWrapper {
             throw new RecipeTransformerException("Could not instantiate the transformer for "
                     + template.getComponentName());
         }
-        logger.atInfo().log("Found transformer for template " + template.getComponentName());
     }
 
-    Pair<ComponentRecipe, List<Path>> expandOne(ComponentRecipe paramFile)
+    ComponentRecipe expandOne(ComponentRecipe paramFile)
             throws RecipeTransformerException {
         return transformer.execute(paramFile);
     }

@@ -11,15 +11,12 @@ import com.aws.greengrass.deployment.templating.exceptions.MissingTemplateParame
 import com.aws.greengrass.deployment.templating.exceptions.RecipeTransformerException;
 import com.aws.greengrass.deployment.templating.exceptions.TemplateParameterException;
 import com.aws.greengrass.deployment.templating.exceptions.TemplateParameterTypeMismatchException;
-import com.aws.greengrass.util.Pair;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.JsonNodeType;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 
-import java.nio.file.Path;
 import java.util.Iterator;
-import java.util.List;
 import java.util.Optional;
 import javax.annotation.Nullable;
 
@@ -47,7 +44,7 @@ public abstract class RecipeTransformer {
     protected static final ObjectMapper RECIPE_SERIALIZER = getRecipeSerializer();
 
     private final JsonNode templateSchema;
-    private JsonNode effectiveDefaultConfig;
+    private final JsonNode effectiveDefaultConfig;
 
     /**
      * Constructor. One class instance for each template; instances are shared between parameter files for the same
@@ -58,7 +55,8 @@ public abstract class RecipeTransformer {
     public RecipeTransformer(ComponentRecipe templateRecipe)
             throws TemplateParameterException {
         templateSchema = initTemplateSchema();
-        templateConfig(templateRecipe.getComponentConfiguration().getDefaultConfiguration());
+        effectiveDefaultConfig = getAndValidateTemplateComponentConfig(
+                templateRecipe.getComponentConfiguration().getDefaultConfiguration());
     }
 
     /**
@@ -71,10 +69,10 @@ public abstract class RecipeTransformer {
     /**
      * Stateless expansion for one component.
      * @param parameterFile the parameter file for the component.
-     * @return a pair. See the declaration for {@link #transform(ComponentRecipe, JsonNode) transform} for more details.
+     * @return a recipe. See the declaration for {@link #transform(ComponentRecipe, JsonNode) transform}.
      * @throws RecipeTransformerException if the provided parameters violate the template schema.
      */
-    public Pair<ComponentRecipe, List<Path>> execute(ComponentRecipe parameterFile) throws RecipeTransformerException {
+    public ComponentRecipe execute(ComponentRecipe parameterFile) throws RecipeTransformerException {
         JsonNode effectiveComponentParams = mergeAndValidateComponentParams(parameterFile);
         return transform(parameterFile, effectiveComponentParams);
     }
@@ -83,11 +81,10 @@ public abstract class RecipeTransformer {
      * Transforms the parameter file into a full recipe.
      * @param paramFile the parameter file object.
      * @param componentParams the effective component parameters to use during expansion.
-     * @return a pair consisting of {newRecipe, artifactsToCopy}. newRecipe is the expanded recipe file;
-     *     artifactsToCopy is a list of artifacts to inject into the expanded component's runtime artifact directory.
+     * @return the expanded recipe.
      * @throws RecipeTransformerException if there is any error with the transformation.
      */
-    public abstract Pair<ComponentRecipe, List<Path>> transform(ComponentRecipe paramFile, JsonNode componentParams)
+    public abstract ComponentRecipe transform(ComponentRecipe paramFile, JsonNode componentParams)
             throws RecipeTransformerException;
 
     /**
@@ -96,13 +93,12 @@ public abstract class RecipeTransformer {
      * @throws TemplateParameterException if the template recipe file or given configuration is malformed.
      */
     @SuppressWarnings("PMD.ForLoopCanBeForeach")
-    protected void templateConfig(JsonNode defaultConfig) throws
-            TemplateParameterException {
+    protected JsonNode getAndValidateTemplateComponentConfig(JsonNode defaultConfig) throws TemplateParameterException {
         // validate schema in template matches internal schema, just for good measure
         JsonNode recipeProvidedSchema = defaultConfig.get(TEMPLATE_PARAMETER_SCHEMA_KEY);
         if (recipeProvidedSchema == null && templateSchema.size() != 0) {
             throw new TemplateParameterException("Template recipe did not provide a schema but transformer requires "
-                    + "schema:\n" + templateSchema.toString());
+                    + "schema:\n" + templateSchema);
         }
         if (!templateSchema.equals(defaultConfig.get(TEMPLATE_PARAMETER_SCHEMA_KEY))) {
             throw new TemplateParameterException("Template recipe provided schema different from template transformer"
@@ -139,9 +135,12 @@ public abstract class RecipeTransformer {
             }
         }
 
-        effectiveDefaultConfig = defaultNode;
+        return defaultNode;
     }
 
+    // merges the template-provided default parameters and parameters provided by the parameter file. validates the
+    // resulting parameter set satisfies the schema declared by the template.
+    // returns the resulting parameter set.
     protected JsonNode mergeAndValidateComponentParams(ComponentRecipe paramFile)
             throws RecipeTransformerException {
         JsonNode paramNode = paramFile.getComponentConfiguration().getDefaultConfiguration();
@@ -156,6 +155,8 @@ public abstract class RecipeTransformer {
 
 
     /* Utility functions */
+
+    // checks the provided parameter map satisfies the schema
     @SuppressWarnings("PMD.ForLoopCanBeForeach")
     void validateParams(JsonNode params) throws TemplateParameterException {
         // check both ways
@@ -182,7 +183,8 @@ public abstract class RecipeTransformer {
         }
     }
 
-    // merge default-provided parameters into custom component specifications (custom takes precedence)
+    // merge the defaultVal parameter map into the customVal parameter map by set addition. if both declare a value
+    // for the same parameter, the one in customVal takes precedence.
     protected static Optional<JsonNode> mergeParams(@Nullable JsonNode defaultVal, @Nullable JsonNode customVal) {
         if (defaultVal == null) {
             return Optional.ofNullable(customVal);

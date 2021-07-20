@@ -52,9 +52,9 @@ public class TemplateEngine {
     @Inject
     EZPlugins ezPlugins;
 
-    private Map<ComponentIdentifier, ComponentRecipe> recipes = null;
-    private Map<String, ComponentIdentifier> templates = null;
-    private Map<String, List<ComponentIdentifier>> needsToBeBuilt = null;
+    private Map<ComponentIdentifier, ComponentRecipe> mapOfComponentIdentifierToRecipe = null;
+    private Map<String, ComponentIdentifier> mapOfTemplateNameToTemplateIdentifier = null;
+    private Map<String, List<ComponentIdentifier>> mapOfTemplateToComponentsToBeBuilt = null;
 
     /**
      * Constructor.
@@ -96,18 +96,18 @@ public class TemplateEngine {
     public void process(Path recipeDirectoryPath, Path artifactsDirectoryPath) throws TemplateExecutionException,
             IOException, PackageLoadingException, RecipeTransformerException {
         // init state
-        recipes = new HashMap<>();
-        templates = new HashMap<>();
-        needsToBeBuilt = new HashMap<>();
+        mapOfComponentIdentifierToRecipe = new HashMap<>();
+        mapOfTemplateNameToTemplateIdentifier = new HashMap<>();
+        mapOfTemplateToComponentsToBeBuilt = new HashMap<>();
 
         loadComponents(recipeDirectoryPath);
         // TODO: resolve versioning, download dependencies if necessary
         expandAll(artifactsDirectoryPath);
 
         // cleanup state
-        recipes = null;
-        templates = null;
-        needsToBeBuilt = null;
+        mapOfComponentIdentifierToRecipe = null;
+        mapOfTemplateNameToTemplateIdentifier = null;
+        mapOfTemplateToComponentsToBeBuilt = null;
     }
 
     /**
@@ -127,22 +127,24 @@ public class TemplateEngine {
         }
     }
 
-    @SuppressWarnings("PMD.AvoidDuplicateLiterals")
     void loadComponent(Path recipePath) throws TemplateExecutionException, IOException {
+        // add component to necessary maps
         ComponentRecipe recipe = parseFile(recipePath);
         ComponentIdentifier identifier = new ComponentIdentifier(recipe.getComponentName(),
                 recipe.getComponentVersion());
-        recipes.put(identifier, recipe);
+        mapOfComponentIdentifierToRecipe.put(identifier, recipe);
         if (recipe.getComponentName().endsWith(TEMPLATE_TEMP_IDENTIFIER)) { // TODO: same as above
-            templates.put(recipe.getComponentName(), identifier);
+            mapOfTemplateNameToTemplateIdentifier.put(recipe.getComponentName(), identifier);
         }
+
+        // check if template is a parameter file through its dependencies. add it to the build queue if it is.
         Map<String, DependencyProperties> deps = recipe.getComponentDependencies();
         if (deps == null) {
             return;
         }
-        boolean paramFileAlreadyHasDependency = false;
-        for (Map.Entry<String, DependencyProperties> me : deps.entrySet()) {
-            if (me.getKey().endsWith(TEMPLATE_TEMP_IDENTIFIER)) { // TODO: same as above
+        boolean paramFileAlreadyHasDependency = false; // a parameter file can only have one template dependency
+        for (Map.Entry<String, DependencyProperties> dependencyEntry : deps.entrySet()) {
+            if (dependencyEntry.getKey().endsWith(TEMPLATE_TEMP_IDENTIFIER)) { // TODO: same as above
                 if (identifier.getName().endsWith(TEMPLATE_TEMP_IDENTIFIER)) { // TODO: here too
                     throw new IllegalTemplateDependencyException("Illegal dependency for template "
                             + identifier.getName() + ". Templates cannot depend on other templates");
@@ -152,13 +154,12 @@ public class TemplateEngine {
                             + " has multiple template dependencies");
                 }
                 paramFileAlreadyHasDependency = true;
-                needsToBeBuilt.putIfAbsent(me.getKey(), new ArrayList<>());
-                needsToBeBuilt.get(me.getKey()).add(identifier);
+                // add param file to build queue for template
+                mapOfTemplateToComponentsToBeBuilt.putIfAbsent(dependencyEntry.getKey(), new ArrayList<>());
+                mapOfTemplateToComponentsToBeBuilt.get(dependencyEntry.getKey()).add(identifier);
             }
         }
     }
-
-    // process all templates and parameter files
 
     /**
      * Process all templates and parameter files.
@@ -169,8 +170,8 @@ public class TemplateEngine {
      */
     void expandAll(Path artifactsDirectoryPath)
             throws PackageLoadingException, RecipeTransformerException, IOException {
-        for (Map.Entry<String, List<ComponentIdentifier>> entry : needsToBeBuilt.entrySet()) {
-            ComponentIdentifier template = templates.get(entry.getKey());
+        for (Map.Entry<String, List<ComponentIdentifier>> entry : mapOfTemplateToComponentsToBeBuilt.entrySet()) {
+            ComponentIdentifier template = mapOfTemplateNameToTemplateIdentifier.get(entry.getKey());
             if (template == null) {
                 throw new PackageLoadingException("Could not get template component " + entry.getKey());
             }
@@ -180,26 +181,14 @@ public class TemplateEngine {
         }
     }
 
+    // expand all the recipes that depend on a specific template. save updated recipes to componentStore
     void expandAllForTemplate(ComponentIdentifier template, Path templateJarFile, List<ComponentIdentifier> paramFiles)
             throws IOException, PackageLoadingException, RecipeTransformerException {
         TransformerWrapper wrapper;
-         wrapper = new TransformerWrapper(templateJarFile, recipes.get(template), ezPlugins);
+         wrapper = new TransformerWrapper(templateJarFile, mapOfComponentIdentifierToRecipe.get(template), ezPlugins);
         for (ComponentIdentifier paramFile : paramFiles) {
-            Pair<ComponentRecipe, List<Path>> rt =
-                    wrapper.expandOne(recipes.get(paramFile));
-            componentStore.savePackageRecipe(paramFile, getRecipeSerializer().writeValueAsString(rt.getLeft()));
-            Path componentArtifactsDirectory = componentStore.resolveArtifactDirectoryPath(paramFile);
-            for (Path artifactPath : rt.getRight()) {
-                copyArtifactToStoreIfMissing(artifactPath, componentArtifactsDirectory);
-            }
-        }
-    }
-
-    // copies the artifact to the artifacts directory, if one with the same name does not already exist
-    void copyArtifactToStoreIfMissing(Path artifactPath, Path componentArtifactsDirectory) throws IOException {
-        Path newArtifact = componentArtifactsDirectory.resolve(artifactPath.getFileName());
-        if (!Files.exists(newArtifact)) {
-            Files.copy(artifactPath, newArtifact);
+            ComponentRecipe expandedRecipe = wrapper.expandOne(mapOfComponentIdentifierToRecipe.get(paramFile));
+            componentStore.savePackageRecipe(paramFile, getRecipeSerializer().writeValueAsString(expandedRecipe));
         }
     }
 
