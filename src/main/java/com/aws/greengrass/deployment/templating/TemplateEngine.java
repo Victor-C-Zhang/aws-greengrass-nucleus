@@ -7,6 +7,7 @@ package com.aws.greengrass.deployment.templating;
 
 import com.amazon.aws.iot.greengrass.component.common.ComponentRecipe;
 import com.amazon.aws.iot.greengrass.component.common.DependencyProperties;
+import com.amazon.aws.iot.greengrass.component.common.PlatformSpecificManifest;
 import com.aws.greengrass.componentmanager.ComponentStore;
 import com.aws.greengrass.componentmanager.exceptions.PackageLoadingException;
 import com.aws.greengrass.componentmanager.models.ComponentIdentifier;
@@ -153,6 +154,18 @@ public class TemplateEngine {
                     throw new MultipleTemplateDependencyException("Parameter file " + identifier.getName()
                             + " has multiple template dependencies");
                 }
+
+                // assume we're provided all the right components and the versions match properly.
+                // TODO: allow for dependency resolution of template versions
+                ComponentIdentifier templateId =
+                        mapOfTemplateNameToTemplateIdentifier.get(dependencyEntry.getKey());
+                if (!dependencyEntry.getValue().getVersionRequirement().isSatisfiedBy(templateId.getVersion())) {
+                    throw new IllegalTemplateDependencyException("Component " + identifier.getName() + " depends on a"
+                            + " version of " + templateId.getName() + " that can't be found locally. Requirement is "
+                            + dependencyEntry.getValue().getVersionRequirement()
+                            + " but have " + templateId.getVersion());
+                }
+
                 paramFileAlreadyHasDependency = true;
                 // add param file to build queue for template
                 mapOfTemplateToComponentsToBeBuilt.putIfAbsent(dependencyEntry.getKey(), new ArrayList<>());
@@ -175,6 +188,22 @@ public class TemplateEngine {
             if (template == null) {
                 throw new PackageLoadingException("Could not get template component " + entry.getKey());
             }
+
+            // assert templates have no lifecycle. TODO: do this in the nucleus, similar to provisioning plugin
+            ComponentRecipe templateRecipe = mapOfComponentIdentifierToRecipe.get(template);
+            for (PlatformSpecificManifest manifest : templateRecipe.getManifests()) {
+                if (manifest.getLifecycle() != null && manifest.getLifecycle().size() != 0) {
+                    throw new RecipeTransformerException("Templates cannot have non-empty lifecycle. "
+                            + template.getName() + " has a lifecycle map with "
+                            + manifest.getLifecycle().size() + " key/value pairs.");
+                }
+            }
+            if (templateRecipe.getLifecycle() != null && templateRecipe.getLifecycle().size() != 0) {
+                throw new RecipeTransformerException("Templates cannot have non-empty lifecycle. "
+                        + template.getName() + " has a lifecycle map with "
+                        + templateRecipe.getLifecycle().size() + " key/value pairs.");
+            }
+
             Path templateJarPath = artifactsDirectoryPath.resolve(template.getName())
                     .resolve(template.getVersion().toString()).resolve(PARSER_JAR);
             expandAllForTemplate(template, templateJarPath, entry.getValue());

@@ -15,13 +15,10 @@ import com.aws.greengrass.config.Topics;
 import com.aws.greengrass.deployment.exceptions.DeploymentTaskFailureException;
 import com.aws.greengrass.deployment.model.Deployment;
 import com.aws.greengrass.deployment.model.DeploymentDocument;
-import com.aws.greengrass.deployment.model.DeploymentPackageConfiguration;
 import com.aws.greengrass.deployment.model.DeploymentResult;
 import com.aws.greengrass.deployment.model.DeploymentTask;
-import com.aws.greengrass.deployment.templating.TemplateEngine;
 import com.aws.greengrass.logging.api.Logger;
 import com.aws.greengrass.util.Coerce;
-import com.aws.greengrass.util.Pair;
 import com.vdurmont.semver4j.Semver;
 import lombok.Getter;
 
@@ -109,6 +106,13 @@ public class DefaultDeploymentTask implements DeploymentTask {
             Map<String, Set<ComponentIdentifier>> nonTargetGroupsToRootPackagesMap =
                     getNonTargetGroupToRootPackagesMap(deploymentDocument);
 
+            // Root packages for the target group is taken from deployment document.
+            // Add root components from non-target groups.
+            Set<String> rootPackages = new HashSet<>(deploymentDocument.getRootPackages());
+            nonTargetGroupsToRootPackagesMap.values().forEach(packages -> {
+                packages.forEach(p -> rootPackages.add(p.getName()));
+            });
+
             resolveDependenciesFuture = executorService.submit(() ->
                     dependencyResolver.resolveDependencies(deploymentDocument, nonTargetGroupsToRootPackagesMap));
 
@@ -134,26 +138,8 @@ public class DefaultDeploymentTask implements DeploymentTask {
             preparePackagesFuture = componentManager.preparePackages(desiredPackages);
             preparePackagesFuture.get();
 
-            // remove templates from deployment
-            Pair<List<ComponentIdentifier>, List<ComponentIdentifier>> separatedPackageList =
-                    TemplateEngine.separateTemplatesFromPackageList(desiredPackages);
-            desiredPackages = separatedPackageList.getLeft();
-
-            List<DeploymentPackageConfiguration> packageListLessTemplates =
-                    TemplateEngine.deploymentPackageConfigurationListLessTemplates(
-                            deployment.getDeploymentDocumentObj().getDeploymentPackageConfigurationList(),
-                            new HashSet<>(separatedPackageList.getRight()));
-            deployment.getDeploymentDocumentObj().setDeploymentPackageConfigurationList(packageListLessTemplates);
-
-            // Root packages for the target group is taken from deployment document.
-            // Add root components from non-target groups.
-            Set<String> rootPackages = new HashSet<>(deploymentDocument.getRootPackages());
-            nonTargetGroupsToRootPackagesMap.values().forEach(packages -> {
-                packages.forEach(p -> rootPackages.add(p.getName()));
-            });
-
-            Map<String, Object> newConfig = kernelConfigResolver.resolve(desiredPackages, deploymentDocument,
-                    new ArrayList<>(rootPackages));
+            Map<String, Object> newConfig =
+                    kernelConfigResolver.resolve(desiredPackages, deploymentDocument, new ArrayList<>(rootPackages));
             if (Thread.currentThread().isInterrupted()) {
                 throw new InterruptedException("Deployment task is interrupted");
             }
@@ -167,7 +153,6 @@ public class DefaultDeploymentTask implements DeploymentTask {
                     .log("Finished deployment task");
 
             componentManager.cleanupStaleVersions();
-
             return result;
         } catch (PackageLoadingException | DeploymentTaskFailureException | IOException e) {
             logger.atError().setCause(e).log("Error occurred while processing deployment");
