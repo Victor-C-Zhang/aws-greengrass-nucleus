@@ -47,6 +47,7 @@ public abstract class RecipeTransformer {
 
     @Getter // for unit testing
     private JsonNode templateSchema;
+    @Getter // for unit testing
     private JsonNode effectiveDefaultConfig;
 
     /**
@@ -234,7 +235,7 @@ public abstract class RecipeTransformer {
             return node.remove(fieldName);
         }
         String invertCaseFieldname = invertCase(fieldName);
-        if (node.has(invertCase(invertCaseFieldname))) {
+        if (node.has(invertCaseFieldname)) {
             return node.remove(invertCaseFieldname);
         }
         return null;

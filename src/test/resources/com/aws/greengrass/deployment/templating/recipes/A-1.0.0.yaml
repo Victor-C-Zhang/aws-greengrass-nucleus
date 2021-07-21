@@ -8,17 +8,6 @@ ComponentDependencies:
     VersionRequirement: '1.0.0'
 ComponentConfiguration:
   DefaultConfiguration:
-<<<<<<< Updated upstream
-    param1: Old param1
-    param2: Old param2
-    resetParam2: reset param2
-Manifests:
-  - Platform:
-      os: all
-    Lifecycle:
-      Run: echo Hello World!
-=======
     param1: This is a test
     param2: val 2
     resetParam2: jeje
->>>>>>> Stashed changes
