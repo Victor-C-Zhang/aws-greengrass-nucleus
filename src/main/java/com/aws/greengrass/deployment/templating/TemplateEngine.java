@@ -12,14 +12,11 @@ import com.aws.greengrass.componentmanager.ComponentStore;
 import com.aws.greengrass.componentmanager.exceptions.PackageLoadingException;
 import com.aws.greengrass.componentmanager.models.ComponentIdentifier;
 import com.aws.greengrass.dependency.EZPlugins;
-import com.aws.greengrass.deployment.model.DeploymentPackageConfiguration;
 import com.aws.greengrass.deployment.templating.exceptions.IllegalTemplateDependencyException;
 import com.aws.greengrass.deployment.templating.exceptions.MultipleTemplateDependencyException;
 import com.aws.greengrass.deployment.templating.exceptions.RecipeTransformerException;
 import com.aws.greengrass.deployment.templating.exceptions.TemplateExecutionException;
 import com.aws.greengrass.util.NucleusPaths;
-import com.aws.greengrass.util.Pair;
-import com.vdurmont.semver4j.Semver;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -28,10 +25,8 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
-import javax.annotation.Nullable;
 import javax.inject.Inject;
 
 import static com.amazon.aws.iot.greengrass.component.common.SerializerFactory.getRecipeSerializer;
@@ -115,21 +110,29 @@ public class TemplateEngine {
      * Read the parameter files and templates from store. Note which parameters files need to be expanded by which
      * template.
      * @throws MultipleTemplateDependencyException  if a parameter file declares a dependency on more than one template.
-     * @throws IllegalTemplateDependencyException   if a template declares a dependency on another template.
+     * @throws IllegalTemplateDependencyException   if a template declares a dependency on another template or a
+     *                                              parameter file declares a dependency on a template version other
+     *                                              than the one provided.
      * @throws IOException                          if something funky happens with I/O or de/serialization.
      */
     void loadComponents(Path recipeDirectoryPath) throws TemplateExecutionException, IOException {
+        scanComponentsIntoEngine(recipeDirectoryPath);
+        populateExpansionQueue();
+    }
+
+    // populate identifier-to-recipe, template name-to-identifier maps
+    void scanComponentsIntoEngine(Path recipeDirectoryPath) throws IOException {
         try (Stream<Path> files = Files.walk(recipeDirectoryPath)) {
             for (Path r : files.collect(Collectors.toList())) {
                 if (!r.toFile().isDirectory()) {
-                    loadComponent(r);
+                    scanComponentIntoEngine(r);
                 }
             }
         }
     }
 
-    void loadComponent(Path recipePath) throws TemplateExecutionException, IOException {
-        // add component to necessary maps
+    // add component to necessary maps
+    void scanComponentIntoEngine(Path recipePath) throws IOException {
         ComponentRecipe recipe = parseFile(recipePath);
         ComponentIdentifier identifier = new ComponentIdentifier(recipe.getComponentName(),
                 recipe.getComponentVersion());
@@ -137,8 +140,19 @@ public class TemplateEngine {
         if (recipe.getComponentName().endsWith(TEMPLATE_TEMP_IDENTIFIER)) { // TODO: same as above
             mapOfTemplateNameToTemplateIdentifier.put(recipe.getComponentName(), identifier);
         }
+    }
 
-        // check if template is a parameter file through its dependencies. add it to the build queue if it is.
+    // scan through the recipes to find parameter files
+    void populateExpansionQueue() throws TemplateExecutionException {
+        for (ComponentIdentifier componentIdentifier : mapOfComponentIdentifierToRecipe.keySet()) {
+            addOneToExpansionQueue(componentIdentifier);
+        }
+    }
+
+    // check if component is a parameter file through its dependencies. add it to the build queue if it is.
+    // throws TemplateExecutionException if there is a bad dependency requirement.
+    void addOneToExpansionQueue(ComponentIdentifier identifier) throws TemplateExecutionException {
+        ComponentRecipe recipe = mapOfComponentIdentifierToRecipe.get(identifier);
         Map<String, DependencyProperties> deps = recipe.getComponentDependencies();
         if (deps == null) {
             return;
@@ -219,45 +233,5 @@ public class TemplateEngine {
             ComponentRecipe expandedRecipe = wrapper.expandOne(mapOfComponentIdentifierToRecipe.get(paramFile));
             componentStore.savePackageRecipe(paramFile, getRecipeSerializer().writeValueAsString(expandedRecipe));
         }
-    }
-
-    /**
-     * Scan through list of packages, removing templates from package list and keeping track of which packages were
-     * removed.
-     * @param desiredPackages the list of packages to scan through.
-     * @return a Pair where the first value is the resulting package list, less templates; and the second value is
-     *     the list of removed packages.
-     */
-    public static Pair<List<ComponentIdentifier>, List<ComponentIdentifier>> separateTemplatesFromPackageList(
-            List<ComponentIdentifier> desiredPackages) {
-        List<ComponentIdentifier> resultant = new ArrayList<>();
-        List<ComponentIdentifier> removed = new ArrayList<>();
-        desiredPackages.forEach(componentIdentifier -> {
-            // TODO: can we dig through the recipe store to check template status?
-            if (componentIdentifier.getName().endsWith(TEMPLATE_TEMP_IDENTIFIER)) {
-                removed.add(componentIdentifier);
-            } else {
-                resultant.add(componentIdentifier);
-            }
-        });
-        return new Pair<>(resultant, removed);
-    }
-
-    /**
-     * Utility function to remove templates from the list of deployment package configurations.
-     * @param deploymentPackageConfigurationList the list to scan through.
-     * @param templates a collection of components known to be templates.
-     * @return a new list with deployment packages, excluding templates.
-     */
-    public static List<DeploymentPackageConfiguration> deploymentPackageConfigurationListLessTemplates(
-            @Nullable List<DeploymentPackageConfiguration> deploymentPackageConfigurationList,
-            Set<ComponentIdentifier> templates) {
-        if (deploymentPackageConfigurationList == null) {
-            return new ArrayList<>();
-        }
-        return deploymentPackageConfigurationList.stream().filter(packageConfig ->
-                !templates.contains(new ComponentIdentifier(packageConfig.getPackageName(),
-                new Semver(packageConfig.getResolvedVersion()))))
-        .collect(Collectors.toList());
     }
 }

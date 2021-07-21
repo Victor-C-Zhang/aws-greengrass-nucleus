@@ -107,8 +107,8 @@ public class DefaultDeploymentTask implements DeploymentTask {
                     getNonTargetGroupToRootPackagesMap(deploymentDocument);
 
             // Root packages for the target group is taken from deployment document.
-            // Add root components from non-target groups.
             Set<String> rootPackages = new HashSet<>(deploymentDocument.getRootPackages());
+            // Add root components from non-target groups.
             nonTargetGroupsToRootPackagesMap.values().forEach(packages -> {
                 packages.forEach(p -> rootPackages.add(p.getName()));
             });
