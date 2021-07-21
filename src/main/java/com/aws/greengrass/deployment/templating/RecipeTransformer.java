@@ -12,17 +12,13 @@ import com.aws.greengrass.deployment.templating.exceptions.MissingTemplateParame
 import com.aws.greengrass.deployment.templating.exceptions.RecipeTransformerException;
 import com.aws.greengrass.deployment.templating.exceptions.TemplateParameterException;
 import com.aws.greengrass.deployment.templating.exceptions.TemplateParameterTypeMismatchException;
-import com.aws.greengrass.util.Pair;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.JsonNodeType;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import lombok.Getter;
 
-import java.nio.file.Path;
 import java.util.Iterator;
-import java.util.List;
-import java.util.Locale;
 import java.util.Optional;
 import javax.annotation.Nullable;
 
@@ -34,35 +30,35 @@ import static com.amazon.aws.iot.greengrass.component.common.SerializerFactory.g
  */
 public abstract class RecipeTransformer {
     // valid json data types
-    public static final String STRING_TYPE = "string";
-    public static final String NUMBER_TYPE = "number";
-    public static final String OBJECT_TYPE = "object";
-    public static final String ARRAY_TYPE = "array";
-    public static final String BOOLEAN_TYPE = "boolean";
-    public static final String NULL_TYPE = "null";
+    private static final String STRING_TYPE = "string";
+    private static final String NUMBER_TYPE = "number";
+    private static final String OBJECT_TYPE = "object";
+    private static final String ARRAY_TYPE = "array";
+    private static final String BOOLEAN_TYPE = "boolean";
+    private static final String NULL_TYPE = "null";
 
     // TODO: should this be declared in an extension class to ComponentRecipe?
-    public static final String TEMPLATE_PARAMETER_SCHEMA_KEY = "parameterSchema";
-    public static final String TEMPLATE_DEFAULT_PARAMETER_KEY = "parameters";
-    public static final String TEMPLATE_FIELD_REQUIRED_KEY = "required";
-    public static final String TEMPLATE_FIELD_TYPE_KEY = "type";
+    static final String TEMPLATE_PARAMETER_SCHEMA_KEY = "parameterSchema";
+    static final String TEMPLATE_DEFAULT_PARAMETER_KEY = "parameters";
+    static final String TEMPLATE_FIELD_REQUIRED_KEY = "required";
+    static final String TEMPLATE_FIELD_TYPE_KEY = "type";
 
-    public static final ObjectMapper RECIPE_SERIALIZER = getRecipeSerializer();
+    protected static final ObjectMapper RECIPE_SERIALIZER = getRecipeSerializer();
 
-    private final JsonNode templateSchema;
     @Getter // for unit testing
+    private JsonNode templateSchema;
     private JsonNode effectiveDefaultConfig;
 
     /**
-     * Constructor. One class instance for each template; instances are shared between parameter files for the same
-     * template.
+     * Post-construction and injection, initialize the transformer with a template.
      * @param templateRecipe to extract default params, param schema.
      * @throws TemplateParameterException if the template recipe or custom config is malformed.
      */
-    public RecipeTransformer(ComponentRecipe templateRecipe) throws TemplateParameterException {
+    void initTemplateRecipe(ComponentRecipe templateRecipe) throws TemplateParameterException {
         JsonNode temp = initTemplateSchema();
         templateSchema = (temp == null) ? getRecipeSerializer().createObjectNode() : temp;
-        templateConfig(templateRecipe.getComponentConfiguration().getDefaultConfiguration());
+        effectiveDefaultConfig = getAndValidateTemplateComponentConfig(
+                templateRecipe.getComponentConfiguration().getDefaultConfiguration());
     }
 
     /**
@@ -75,10 +71,10 @@ public abstract class RecipeTransformer {
     /**
      * Stateless expansion for one component.
      * @param parameterFile the parameter file for the component.
-     * @return a pair. See the declaration for {@link #transform(ComponentRecipe, JsonNode) transform} for more details.
+     * @return a recipe. See the declaration for {@link #transform(ComponentRecipe, JsonNode) transform}.
      * @throws RecipeTransformerException if the provided parameters violate the template schema.
      */
-    public Pair<ComponentRecipe, List<Path>> execute(ComponentRecipe parameterFile) throws RecipeTransformerException {
+    public ComponentRecipe execute(ComponentRecipe parameterFile) throws RecipeTransformerException {
         JsonNode effectiveComponentParams = mergeAndValidateComponentParams(parameterFile);
         return transform(parameterFile, effectiveComponentParams);
     }
@@ -87,11 +83,10 @@ public abstract class RecipeTransformer {
      * Transforms the parameter file into a full recipe.
      * @param paramFile the parameter file object.
      * @param componentParams the effective component parameters to use during expansion.
-     * @return a pair consisting of {newRecipe, artifactsToCopy}. newRecipe is the expanded recipe file;
-     *     artifactsToCopy is a list of artifacts to inject into the expanded component's runtime artifact directory.
+     * @return the expanded recipe.
      * @throws RecipeTransformerException if there is any error with the transformation.
      */
-    public abstract Pair<ComponentRecipe, List<Path>> transform(ComponentRecipe paramFile, JsonNode componentParams)
+    public abstract ComponentRecipe transform(ComponentRecipe paramFile, JsonNode componentParams)
             throws RecipeTransformerException;
 
     /**
@@ -100,13 +95,12 @@ public abstract class RecipeTransformer {
      * @throws TemplateParameterException if the template recipe file or given configuration is malformed.
      */
     @SuppressWarnings("PMD.ForLoopCanBeForeach")
-    protected void templateConfig(JsonNode defaultConfig) throws
-            TemplateParameterException {
+    protected JsonNode getAndValidateTemplateComponentConfig(JsonNode defaultConfig) throws TemplateParameterException {
         // validate schema in template matches internal schema, just for good measure
         JsonNode recipeProvidedSchema = defaultConfig.get(TEMPLATE_PARAMETER_SCHEMA_KEY);
         if (recipeProvidedSchema == null && templateSchema.size() != 0) {
             throw new TemplateParameterException("Template recipe did not provide a schema but transformer requires "
-                    + "schema:\n" + templateSchema.toString());
+                    + "schema:\n" + templateSchema);
         }
         if (!templateSchema.equals(defaultConfig.get(TEMPLATE_PARAMETER_SCHEMA_KEY))) {
             throw new TemplateParameterException("Template recipe provided schema different from template transformer"
@@ -147,9 +141,12 @@ public abstract class RecipeTransformer {
             }
         }
 
-        effectiveDefaultConfig = defaultNode;
+        return defaultNode;
     }
 
+    // merges the template-provided default parameters and parameters provided by the parameter file. validates the
+    // resulting parameter set satisfies the schema declared by the template.
+    // returns the resulting parameter set.
     protected JsonNode mergeAndValidateComponentParams(ComponentRecipe paramFile)
             throws RecipeTransformerException {
         ComponentConfiguration componentConfiguration = paramFile.getComponentConfiguration();
@@ -168,6 +165,8 @@ public abstract class RecipeTransformer {
 
 
     /* Utility functions */
+
+    // checks the provided parameter map satisfies the schema
     @SuppressWarnings("PMD.ForLoopCanBeForeach")
     void validateParams(JsonNode params) throws TemplateParameterException {
         // check both ways
@@ -195,7 +194,8 @@ public abstract class RecipeTransformer {
         }
     }
 
-    // merge default-provided parameters into custom component specifications (custom takes precedence)
+    // merge the defaultVal parameter map into the customVal parameter map by set addition. if both declare a value
+    // for the same parameter, the one in customVal takes precedence.
     static JsonNode mergeParams(JsonNode defaultVal, @Nullable JsonNode customVal) {
         if (customVal == null) {
             return defaultVal;
@@ -224,14 +224,7 @@ public abstract class RecipeTransformer {
         if (node.has(fieldName)) {
             return node.get(fieldName);
         }
-        char inverseCaseFirstChar;
-        if (Character.isUpperCase(fieldName.charAt(0))) {
-            inverseCaseFirstChar = Character.toLowerCase(fieldName.charAt(0));
-        } else {
-            inverseCaseFirstChar = Character.toUpperCase(fieldName.charAt(0));
-        }
-        String inverseCaseFieldName = inverseCaseFirstChar + fieldName.substring(1);
-        return node.get(inverseCaseFieldName);
+        return node.get(invertCase(fieldName));
     }
 
     // similar, but remove instead of get. note it has the same contract as remove; that is, if field doesn't exist,
@@ -240,15 +233,9 @@ public abstract class RecipeTransformer {
         if (node.has(fieldName)) {
             return node.remove(fieldName);
         }
-        char inverseCaseFirstChar;
-        if (Character.isUpperCase(fieldName.charAt(0))) {
-            inverseCaseFirstChar = Character.toLowerCase(fieldName.charAt(0));
-        } else {
-            inverseCaseFirstChar = Character.toUpperCase(fieldName.charAt(0));
-        }
-        String inverseCaseFieldName = inverseCaseFirstChar + fieldName.substring(1);
-        if (node.has(inverseCaseFieldName)) {
-            return node.remove(inverseCaseFieldName);
+        String invertCaseFieldname = invertCase(fieldName);
+        if (node.has(invertCase(invertCaseFieldname))) {
+            return node.remove(invertCaseFieldname);
         }
         return null;
     }
@@ -258,19 +245,23 @@ public abstract class RecipeTransformer {
         if (node.has(fieldName)) {
             return true;
         }
+        return node.has(invertCase(fieldName));
+    }
+
+    // invert the case of the first character in a string
+    protected static String invertCase(String camelCaseString) {
         char inverseCaseFirstChar;
-        if (Character.isUpperCase(fieldName.charAt(0))) {
-            inverseCaseFirstChar = Character.toLowerCase(fieldName.charAt(0));
+        if (Character.isUpperCase(camelCaseString.charAt(0))) {
+            inverseCaseFirstChar = Character.toLowerCase(camelCaseString.charAt(0));
         } else {
-            inverseCaseFirstChar = Character.toUpperCase(fieldName.charAt(0));
+            inverseCaseFirstChar = Character.toUpperCase(camelCaseString.charAt(0));
         }
-        String inverseCaseFieldName = inverseCaseFirstChar + fieldName.substring(1);
-        return node.has(inverseCaseFieldName);
+        return inverseCaseFirstChar + camelCaseString.substring(1);
     }
 
     // Utility to get the node type from a string. Useful when parsing type from JSON.
     protected static JsonNodeType nodeType(String typeString) {
-        String lowercased = typeString.toLowerCase(Locale.ROOT);
+        String lowercased = typeString.toLowerCase();
         switch (lowercased) {
             case STRING_TYPE: return JsonNodeType.STRING;
             case NUMBER_TYPE: return JsonNodeType.NUMBER;

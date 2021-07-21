@@ -12,19 +12,14 @@ import com.amazon.aws.iot.greengrass.component.common.PlatformSpecificManifest;
 import com.amazon.aws.iot.greengrass.component.common.RecipeFormatVersion;
 import com.aws.greengrass.deployment.templating.RecipeTransformer;
 import com.aws.greengrass.deployment.templating.exceptions.TemplateParameterException;
-import com.aws.greengrass.util.Pair;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 
-import java.nio.file.Path;
-import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 
 public class EchoTransformer extends RecipeTransformer {
-
     private static final String COMPONENT_DESCRIPTION = "Component expanded with EchoTransformer";
     private static final String COMPONENT_PUBLISHER = "Me";
 
@@ -34,17 +29,6 @@ public class EchoTransformer extends RecipeTransformer {
             + "    \"required\": true\n" + "  },\n" + "  \"resetParam1\": {\n" + "    \"type\": \"string\",\n"
             + "    \"required\": false\n" + "  },\n" + "  \"resetParam2\": {\n" + "    \"type\": \"string\",\n"
             + "    \"required\": true\n" + "  },\n" + "}";
-
-    /**
-     * Constructor. One class instance for each template; instances are shared between parameter files for the same
-     * template.
-     *
-     * @param templateRecipe to extract default params, param schema.
-     * @throws TemplateParameterException if the template recipe or custom config is malformed.
-     */
-    public EchoTransformer(ComponentRecipe templateRecipe) throws TemplateParameterException {
-        super(templateRecipe);
-    }
 
     @Override
     protected JsonNode initTemplateSchema() throws TemplateParameterException {
@@ -57,7 +41,7 @@ public class EchoTransformer extends RecipeTransformer {
 
     // generate a component recipe from a list of well-behaved parameters
     @Override
-    public Pair<ComponentRecipe, List<Path>> transform(ComponentRecipe paramFile, JsonNode componentConfig) {
+    public ComponentRecipe transform(ComponentRecipe paramFile, JsonNode componentConfig) {
         Map<String, Object> newLifecyle = new HashMap<>();
         String runString = "echo Param1: " + componentConfig.get("param1").asText() + " Param2: " + componentConfig.get(
                 "param2").asText() + " ResetParam1: " + componentConfig.get("resetParam1").asText() + " ResetParam2: "
@@ -68,7 +52,7 @@ public class EchoTransformer extends RecipeTransformer {
                 PlatformSpecificManifest.builder().lifecycle(newLifecyle).platform(
                         Platform.builder().os(Platform.OS.ALL).build()).build();
 
-        ComponentRecipe newRecipe = ComponentRecipe.builder()
+        return ComponentRecipe.builder()
                 .recipeFormatVersion(RecipeFormatVersion.JAN_25_2020)
                 .componentName(paramFile.getComponentName())
                 .componentVersion(paramFile.getComponentVersion())
@@ -77,8 +61,5 @@ public class EchoTransformer extends RecipeTransformer {
                 .componentType(ComponentType.GENERIC)
                 .manifests(Collections.singletonList(manifest))
                 .build();
-
-        List<Path> artifactsToCopy = new ArrayList<>();
-        return new Pair<>(newRecipe, artifactsToCopy);
     }
 }
