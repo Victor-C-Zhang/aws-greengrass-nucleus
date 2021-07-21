@@ -18,6 +18,7 @@ import com.aws.greengrass.deployment.exceptions.DeploymentTaskFailureException;
 import com.aws.greengrass.deployment.model.Deployment;
 import com.aws.greengrass.deployment.model.DeploymentResult;
 import com.aws.greengrass.deployment.model.DeploymentResult.DeploymentStatus;
+import com.aws.greengrass.deployment.templating.TemplateEngine;
 import com.aws.greengrass.lifecyclemanager.GreengrassService;
 import com.aws.greengrass.lifecyclemanager.Kernel;
 import com.aws.greengrass.logging.impl.GreengrassLogMessage;
@@ -122,6 +123,8 @@ class DeploymentServiceTest extends GGServiceTestUtil {
     private IotJobsHelper iotJobsHelper;
     @Mock
     private ThingGroupHelper thingGroupHelper;
+    @Mock
+    private TemplateEngine templateEngine;
 
     private Thread deploymentServiceThread;
 
@@ -142,7 +145,7 @@ class DeploymentServiceTest extends GGServiceTestUtil {
         // Creating the class to be tested
         deploymentService = new DeploymentService(config, mockExecutorService, dependencyResolver, componentManager,
                 kernelConfigResolver, deploymentConfigMerger, deploymentStatusKeeper, deploymentDirectoryManager,
-                context, mockKernel, deviceConfiguration, thingGroupHelper);
+                context, mockKernel, deviceConfiguration, thingGroupHelper, templateEngine);
         deploymentService.postInject();
 
         deploymentQueue = new DeploymentQueue();

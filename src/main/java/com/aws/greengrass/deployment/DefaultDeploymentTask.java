@@ -68,7 +68,7 @@ public class DefaultDeploymentTask implements DeploymentTask {
      * @param deployment                   Deployment instance
      * @param deploymentServiceConfig      Deployment service configuration Topics
      * @param executorService              Executor service
-     * @param deploymentDocumentDownloader download large deployment document.
+     * @param deploymentDocumentDownloader download large deployment document
      * @param thingGroupHelper             Executor service
      */
     @SuppressWarnings("PMD.ExcessiveParameterList")

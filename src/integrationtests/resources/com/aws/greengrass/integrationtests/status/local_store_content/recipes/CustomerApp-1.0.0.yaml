@@ -7,33 +7,22 @@ ComponentVersion: '1.0.0'
 ComponentConfiguration:
   DefaultConfiguration:
     sampleText: This is a test
+ComponentDependencies:
+  Mosquitto:
+    VersionRequirement: '1.0.0'
 
 Manifests:
   - Platform:
       os: windows
-    Parameters:
-      - name: sampleText
-        value: This is a test
-        type: STRING
     Lifecycle:
       run: |-
         powershell -command "& { echo \"Hello Greengrass. {configuration:/sampleTest}\" }"
-    Dependencies:
-      Mosquitto:
-        VersionRequirement: 1.0.0
     Artifacts:
       - URI: s3://mock-bucket/customerApp
   - Platform:
       os: all
-    Parameters:
-      - name: sampleText
-        value: This is a test
-        type: STRING
     Lifecycle:
       run:
         echo "Hello Greengrass. {configuration:/sampleTest}"
-    Dependencies:
-      Mosquitto:
-        VersionRequirement: 1.0.0
     Artifacts:
       - URI: s3://mock-bucket/customerApp

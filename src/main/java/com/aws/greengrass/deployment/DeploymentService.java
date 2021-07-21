@@ -31,6 +31,9 @@ import com.aws.greengrass.deployment.model.DeploymentResult.DeploymentStatus;
 import com.aws.greengrass.deployment.model.DeploymentTask;
 import com.aws.greengrass.deployment.model.DeploymentTaskMetadata;
 import com.aws.greengrass.deployment.model.LocalOverrideRequest;
+import com.aws.greengrass.deployment.templating.TemplateEngine;
+import com.aws.greengrass.deployment.templating.exceptions.RecipeTransformerException;
+import com.aws.greengrass.deployment.templating.exceptions.TemplateExecutionException;
 import com.aws.greengrass.lifecyclemanager.GreengrassService;
 import com.aws.greengrass.lifecyclemanager.Kernel;
 import com.aws.greengrass.lifecyclemanager.KernelAlternatives;
@@ -125,6 +128,8 @@ public class DeploymentService extends GreengrassService {
     private DeploymentDocumentDownloader deploymentDocumentDownloader;
     @Inject
     private ThingGroupHelper thingGroupHelper;
+    @Inject
+    private TemplateEngine templateEngine;
 
     /**
      * Constructor.
@@ -152,7 +157,7 @@ public class DeploymentService extends GreengrassService {
             ComponentManager componentManager, KernelConfigResolver kernelConfigResolver,
             DeploymentConfigMerger deploymentConfigMerger, DeploymentStatusKeeper deploymentStatusKeeper,
             DeploymentDirectoryManager deploymentDirectoryManager, Context context, Kernel kernel,
-            DeviceConfiguration deviceConfiguration, ThingGroupHelper thingGroupHelper) {
+            DeviceConfiguration deviceConfiguration, ThingGroupHelper thingGroupHelper, TemplateEngine templateEngine) {
         super(topics);
         this.executorService = executorService;
         this.dependencyResolver = dependencyResolver;
@@ -166,6 +171,7 @@ public class DeploymentService extends GreengrassService {
         this.deviceConfiguration = deviceConfiguration;
         this.pollingFrequency.set(getPollingFrequency(deviceConfiguration.getDeploymentPollingFrequencySeconds()));
         this.thingGroupHelper = thingGroupHelper;
+        this.templateEngine = templateEngine;
     }
 
     @Override
@@ -494,6 +500,14 @@ public class DeploymentService extends GreengrassService {
             }
         }
 
+        try {
+            templateEngine.process();
+        } catch (TemplateExecutionException | PackageLoadingException | IOException | RecipeTransformerException e) {
+            logger.atError().log("Error expanding templates", e);
+            updateDeploymentResultAsFailed(deployment, deploymentTask, false, e);
+            return;
+        }
+
 
         Future<DeploymentResult> process = executorService.submit(deploymentTask);
         logger.atInfo().kv("deployment", deployment.getId()).log("Started deployment execution");
@@ -568,12 +582,40 @@ public class DeploymentService extends GreengrassService {
     @SuppressWarnings("PMD.ExceptionAsFlowControl")
     public static ComponentRecipe copyRecipeFileToComponentStore(ComponentStore componentStore,
                                                                  Path recipePath, Logger logger) throws IOException {
-        String ext = Utils.extension(recipePath.toString());
-        ComponentRecipe recipe = null;
-
         //reading it in as a recipe, so that will fail if it is malformed with a good error.
         //The second reason to do this is to parse the name and version so that we can properly name
         //the file when writing it into the local recipe store.
+        ComponentRecipe recipe = parseFile(recipePath);
+        if (recipe == null) {
+            logger.atError().log("Skipping file {} because it was not recognized as a recipe", recipePath);
+            return null;
+        }
+
+        // Write the recipe as YAML with the proper filename into the store
+        ComponentIdentifier componentIdentifier =
+                new ComponentIdentifier(recipe.getComponentName(), recipe.getComponentVersion());
+
+        try {
+            componentStore
+                    .savePackageRecipe(componentIdentifier, getRecipeSerializer().writeValueAsString(recipe));
+        } catch (PackageLoadingException e) {
+            // Throw on error so that the user will receive this message and we will stop the deployment.
+            // This is to fail fast while providing actionable feedback.
+            throw new IOException(String.format("Unable to copy recipe for '%s' to component store due to: %s",
+                    componentIdentifier, e.getMessage()), e);
+        }
+        return recipe;
+    }
+
+    /**
+     * Parse the given recipe file into a POJO object.
+     * @param recipePath path to the recipe file.
+     * @return ComponentRecipe file content.
+     * @throws IOException on I/O error.
+     */
+    public static ComponentRecipe parseFile(Path recipePath) throws IOException {
+        String ext = Utils.extension(recipePath.toString());
+        ComponentRecipe recipe = null;
         try {
             if (recipePath.toFile().length() > 0) {
                 switch (ext.toLowerCase()) {
@@ -592,26 +634,7 @@ public class DeploymentService extends GreengrassService {
             // Throw on error so that the user will receive this message and we will stop the deployment.
             // This is to fail fast while providing actionable feedback.
             throw new IOException(
-                    String.format("Unable to parse %s as a recipe due to: %s", recipePath.toString(), e.getMessage()),
-                    e);
-        }
-        if (recipe == null) {
-            logger.atError().log("Skipping file {} because it was not recognized as a recipe", recipePath);
-            return null;
-        }
-
-        // Write the recipe as YAML with the proper filename into the store
-        ComponentIdentifier componentIdentifier =
-                new ComponentIdentifier(recipe.getComponentName(), recipe.getComponentVersion());
-
-        try {
-            componentStore
-                    .savePackageRecipe(componentIdentifier, getRecipeSerializer().writeValueAsString(recipe));
-        } catch (PackageLoadingException e) {
-            // Throw on error so that the user will receive this message and we will stop the deployment.
-            // This is to fail fast while providing actionable feedback.
-            throw new IOException(String.format("Unable to copy recipe for '%s' to component store due to: %s",
-                    componentIdentifier.toString(), e.getMessage()), e);
+                    String.format("Unable to parse %s as a recipe due to: %s", recipePath, e.getMessage()), e);
         }
         return recipe;
     }
