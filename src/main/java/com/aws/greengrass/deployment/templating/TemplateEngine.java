@@ -11,7 +11,7 @@ import com.amazon.aws.iot.greengrass.component.common.PlatformSpecificManifest;
 import com.aws.greengrass.componentmanager.ComponentStore;
 import com.aws.greengrass.componentmanager.exceptions.PackageLoadingException;
 import com.aws.greengrass.componentmanager.models.ComponentIdentifier;
-import com.aws.greengrass.dependency.EZPlugins;
+import com.aws.greengrass.dependency.Context;
 import com.aws.greengrass.deployment.templating.exceptions.IllegalTemplateDependencyException;
 import com.aws.greengrass.deployment.templating.exceptions.MultipleTemplateDependencyException;
 import com.aws.greengrass.deployment.templating.exceptions.RecipeTransformerException;
@@ -41,12 +41,9 @@ public class TemplateEngine {
     public static final String PARSER_JAR = "transformer.jar";
     private static final String TEMPLATE_TEMP_IDENTIFIER = "Template"; // TODO: get rid of this once template type is in
 
-    @Inject
-    private ComponentStore componentStore;
-    @Inject
-    private NucleusPaths nucleusPaths;
-    @Inject
-    EZPlugins ezPlugins;
+    private final ComponentStore componentStore;
+    private final NucleusPaths nucleusPaths;
+    private final Context context;
 
     private Map<ComponentIdentifier, ComponentRecipe> mapOfComponentIdentifierToRecipe = null;
     private Map<String, ComponentIdentifier> mapOfTemplateNameToTemplateIdentifier = null;
@@ -54,17 +51,15 @@ public class TemplateEngine {
 
     /**
      * Constructor.
+     * @param componentStore a ComponentStore instance.
+     * @param nucleusPaths   a NucleusPaths instance.
+     * @param context        the context instance.
      */
     @Inject
-    public TemplateEngine() {
-    }
-
-    /**
-     * Constructor for testing only.
-     * @param componentStore a ComponentStore instance.
-     */
-    public TemplateEngine(ComponentStore componentStore) {
+    public TemplateEngine(ComponentStore componentStore, NucleusPaths nucleusPaths, Context context) {
         this.componentStore = componentStore;
+        this.nucleusPaths = nucleusPaths;
+        this.context = context;
     }
 
     /**
@@ -228,7 +223,7 @@ public class TemplateEngine {
     void expandAllForTemplate(ComponentIdentifier template, Path templateJarFile, List<ComponentIdentifier> paramFiles)
             throws IOException, PackageLoadingException, RecipeTransformerException {
         TransformerWrapper wrapper;
-         wrapper = new TransformerWrapper(templateJarFile, mapOfComponentIdentifierToRecipe.get(template), ezPlugins);
+         wrapper = new TransformerWrapper(templateJarFile, mapOfComponentIdentifierToRecipe.get(template), context);
         for (ComponentIdentifier paramFile : paramFiles) {
             ComponentRecipe expandedRecipe = wrapper.expandOne(mapOfComponentIdentifierToRecipe.get(paramFile));
             componentStore.savePackageRecipe(paramFile, getRecipeSerializer().writeValueAsString(expandedRecipe));

@@ -43,17 +43,15 @@ public abstract class RecipeTransformer {
 
     protected static final ObjectMapper RECIPE_SERIALIZER = getRecipeSerializer();
 
-    private final JsonNode templateSchema;
-    private final JsonNode effectiveDefaultConfig;
+    private JsonNode templateSchema;
+    private JsonNode effectiveDefaultConfig;
 
     /**
-     * Constructor. One class instance for each template; instances are shared between parameter files for the same
-     * template.
+     * Post-construction and injection, initialize the transformer with a template.
      * @param templateRecipe to extract default params, param schema.
      * @throws TemplateParameterException if the template recipe or custom config is malformed.
      */
-    public RecipeTransformer(ComponentRecipe templateRecipe)
-            throws TemplateParameterException {
+    void initTemplateRecipe(ComponentRecipe templateRecipe) throws TemplateParameterException {
         templateSchema = initTemplateSchema();
         effectiveDefaultConfig = getAndValidateTemplateComponentConfig(
                 templateRecipe.getComponentConfiguration().getDefaultConfiguration());

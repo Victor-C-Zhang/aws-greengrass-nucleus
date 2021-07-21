@@ -30,17 +30,6 @@ public class EchoTransformer extends RecipeTransformer {
             + "    \"required\": false\n" + "  },\n" + "  \"resetParam2\": {\n" + "    \"type\": \"string\",\n"
             + "    \"required\": true\n" + "  },\n" + "}";
 
-    /**
-     * Constructor. One class instance for each template; instances are shared between parameter files for the same
-     * template.
-     *
-     * @param templateRecipe to extract default params, param schema.
-     * @throws TemplateParameterException if the template recipe or custom config is malformed.
-     */
-    public EchoTransformer(ComponentRecipe templateRecipe) throws TemplateParameterException {
-        super(templateRecipe);
-    }
-
     @Override
     protected JsonNode initTemplateSchema() throws TemplateParameterException {
         try {
