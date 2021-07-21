@@ -33,20 +33,20 @@ public class TransformerWrapper {
                     + pathToExecutable);
         }
         EZPlugins ezPlugins = context.get(EZPlugins.class);
-        AtomicReference<Class<?>> transformerClass = new AtomicReference<>();
+        AtomicReference<Class<RecipeTransformer>> transformerClass = new AtomicReference<>();
         try {
             ezPlugins.loadPlugin(pathToExecutable, sc -> sc.matchSubclassesOf(RecipeTransformer.class, c -> {
                 if (transformerClass.get() != null) {
                     throw new RuntimeException("Found more than one candidate transformer class.");
                 }
-                transformerClass.set(c);
+                transformerClass.set((Class<RecipeTransformer>) c);
             }));
         } catch (IOException | RuntimeException e) {
             throw new RecipeTransformerException(e);
         }
 
         try {
-            transformer = (RecipeTransformer) context.newInstance(transformerClass.get());
+            transformer = context.get(transformerClass.get());
             transformer.initTemplateRecipe(template);
         } catch (Throwable e) {
             throw new RecipeTransformerException("Could not instantiate the transformer for "
