@@ -39,11 +39,15 @@ public class TransformerWrapper {
                 if (transformerClass.get() != null) {
                     throw new RuntimeException("Found more than one candidate transformer class.");
                 }
-
                 transformerClass.set((Class<RecipeTransformer>) c);
             }));
         } catch (IOException | RuntimeException e) {
             throw new RecipeTransformerException(e);
+        }
+
+        if (transformerClass.get() == null) {
+            throw new RecipeTransformerException("Could not find a candidate transformer class for template "
+                    + template.getComponentName());
         }
 
         try {

@@ -19,7 +19,6 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 import lombok.Getter;
 
 import java.util.Iterator;
-import java.util.Optional;
 import javax.annotation.Nullable;
 
 import static com.amazon.aws.iot.greengrass.component.common.SerializerFactory.getRecipeSerializer;
