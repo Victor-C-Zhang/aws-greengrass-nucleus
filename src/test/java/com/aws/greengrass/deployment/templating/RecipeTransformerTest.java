@@ -15,7 +15,6 @@ import com.aws.greengrass.deployment.templating.exceptions.MissingTemplateParame
 import com.aws.greengrass.deployment.templating.exceptions.RecipeTransformerException;
 import com.aws.greengrass.deployment.templating.exceptions.TemplateParameterException;
 import com.aws.greengrass.deployment.templating.exceptions.TemplateParameterTypeMismatchException;
-import com.aws.greengrass.util.Pair;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.BooleanNode;
@@ -26,9 +25,7 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
-import java.nio.file.Path;
 import java.util.Collections;
-import java.util.List;
 
 import static com.amazon.aws.iot.greengrass.component.common.SerializerFactory.getRecipeSerializer;
 import static com.aws.greengrass.deployment.templating.RecipeTransformer.TEMPLATE_DEFAULT_PARAMETER_KEY;
@@ -79,9 +76,6 @@ public class RecipeTransformerTest {
             + "objectParam:\n" + "  key1: val1\n" + "  key2:\n" + "    subkey1: subval2\n" + "    subkey2: subval2\n"
             + "arrayParam:\n" + "  - 1\n" + "  - 2\n" + "  - red\n" + "  - blue";
 
-    static String VALID_INPUT_DEFAULT_PARAMS = "stringParam: unnecessary string\n" + "numberParam: 42069\n"
-            + "objectParam:\n" + "  key1: val1\n" + "  key2:\n" + "    subkey1: subval2\n" + "    subkey2: subval2\n"
-            + "arrayParam:\n" + "  - 1\n" + "  - 2\n" + "  - red\n" + "  - blue";
     static String VALID_EFFECTIVE_DEFAULT_PARAMS = "numberParam: 42069\n" + "objectParam:\n" + "  key1: val1\n"
             + "  key2:\n" + "    subkey1: subval2\n" + "    subkey2: subval2\n" + "arrayParam:\n" + "  - 1\n"
             + "  - 2\n" + "  - red\n" + "  - blue";
@@ -99,7 +93,7 @@ public class RecipeTransformerTest {
     void IF_template_config_is_acceptable_THEN_it_works() throws IOException, TemplateParameterException {
         // no KVs generated for non-optional fields
         recipeTransformer = new FakeRecipeTransformer();
-        recipeTransformer.initTemplateRecipe((getTemplate(defaultTemplateSchema, defaultTemplateDefaultParams)));
+        recipeTransformer.initTemplateRecipe(getTemplate(defaultTemplateSchema, defaultTemplateDefaultParams));
 
         JsonNode effectiveDefaultParams = getRecipeSerializer().readTree(VALID_EFFECTIVE_DEFAULT_PARAMS);
         assertEquals(effectiveDefaultParams, recipeTransformer.getEffectiveDefaultConfig());
@@ -144,7 +138,7 @@ public class RecipeTransformerTest {
     void GIVEN_template_config_read_in_WHEN_provided_invalid_parameters_THEN_throw_error()
             throws IOException, TemplateParameterException {
         recipeTransformer = new FakeRecipeTransformer();
-        recipeTransformer.initTemplateRecipe((getTemplate(defaultTemplateSchema, defaultTemplateDefaultParams)));
+        recipeTransformer.initTemplateRecipe(getTemplate(defaultTemplateSchema, defaultTemplateDefaultParams));
 
         // missing parameter
         String missingBoolean = "stringParam: a string\n" + "numberParam: 42068";
@@ -167,7 +161,7 @@ public class RecipeTransformerTest {
     void GIVEN_template_config_read_in_WHEN_provided_component_configs_THEN_they_are_merged()
             throws IOException, TemplateParameterException, RecipeTransformerException {
         recipeTransformer = new FakeRecipeTransformer();
-        recipeTransformer.initTemplateRecipe((getTemplate(defaultTemplateSchema, defaultTemplateDefaultParams)));
+        recipeTransformer.initTemplateRecipe(getTemplate(defaultTemplateSchema, defaultTemplateDefaultParams));
         String goodConfig = "stringParam: a string\n" + "booleanParam: true\n" + "numberParam: 42068";
         ComponentRecipe goodRecipe = getParameterFileWithParams(goodConfig);
         JsonNode actual = extractDefaultConfig(recipeTransformer.execute(goodRecipe));
@@ -187,10 +181,10 @@ public class RecipeTransformerTest {
                 .recipeFormatVersion(RecipeFormatVersion.JAN_25_2020)
                 .componentName("A")
                 .componentVersion(new Semver("1.0.0"))
-                .componentConfiguration(null)
+//                .componentConfiguration(null)
                 .build();
         RecipeTransformer recipeTransformer = new FakeRecipeTransformer();
-        recipeTransformer.initTemplateRecipe((getTemplate(defaultTemplateSchema, defaultTemplateDefaultParams)));
+        recipeTransformer.initTemplateRecipe(getTemplate(defaultTemplateSchema, defaultTemplateDefaultParams));
         // TODO: break out schema violations into a separate exception from RecipeTransformerException
         assertThrows(RecipeTransformerException.class, () -> recipeTransformer.execute(nullConfig));
 
@@ -228,15 +222,19 @@ public class RecipeTransformerTest {
 
     ComponentRecipe getTemplate(JsonNode schema, JsonNode parameters) {
         ObjectNode defaultConfig = getRecipeSerializer().createObjectNode();
-        if (schema != null) defaultConfig.set(TEMPLATE_PARAMETER_SCHEMA_KEY, schema);
-        if (parameters != null) defaultConfig.set(TEMPLATE_DEFAULT_PARAMETER_KEY, parameters);
+        if (schema != null) {
+            defaultConfig.set(TEMPLATE_PARAMETER_SCHEMA_KEY, schema);
+        }
+        if (parameters != null) {
+            defaultConfig.set(TEMPLATE_DEFAULT_PARAMETER_KEY, parameters);
+        }
         PlatformSpecificManifest manifest =
                 PlatformSpecificManifest.builder().platform(Platform.builder().os(Platform.OS.ALL).build()).build();
         return ComponentRecipe.builder()
                 .recipeFormatVersion(RecipeFormatVersion.JAN_25_2020)
                 .componentName("FakeTransformerTemplate")
                 .componentVersion(new Semver("1.0.0"))
-                .componentConfiguration(new ComponentConfiguration(defaultConfig))
+                .componentConfiguration(ComponentConfiguration.builder().defaultConfiguration(defaultConfig).build())
                 .manifests(Collections.singletonList(manifest))
                 .build();
     }
@@ -248,7 +246,7 @@ public class RecipeTransformerTest {
                 .recipeFormatVersion(RecipeFormatVersion.JAN_25_2020)
                 .componentName("A")
                 .componentVersion(new Semver("1.0.0"))
-                .componentConfiguration(new ComponentConfiguration(paramObj))
+                .componentConfiguration(ComponentConfiguration.builder().defaultConfiguration(paramObj).build())
                 .build();
     }
 
@@ -274,7 +272,7 @@ public class RecipeTransformerTest {
                     .recipeFormatVersion(RecipeFormatVersion.JAN_25_2020)
                     .componentName("A")
                     .componentVersion(new Semver("1.0.0"))
-                    .componentConfiguration(new ComponentConfiguration(componentParams))
+                    .componentConfiguration(ComponentConfiguration.builder().defaultConfiguration(componentParams).build())
                     .build();
         }
     }

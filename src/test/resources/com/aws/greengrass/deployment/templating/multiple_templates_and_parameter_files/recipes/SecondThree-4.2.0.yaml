@@ -1,0 +1,8 @@
+---
+RecipeFormatVersion: '2020-01-25'
+ComponentName: SecondThree
+ComponentPublisher: Me
+ComponentVersion: '4.2.0'
+ComponentDependencies:
+  SecondTemplate:
+    VersionRequirement: '>1.0.5'

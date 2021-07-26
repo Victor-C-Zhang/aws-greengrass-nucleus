@@ -1,0 +1,13 @@
+---
+recipeFormatVersion: '2020-01-25'
+componentName: LoggerC
+componentPublisher: Me
+componentVersion: '1.0.0'
+componentDependencies:
+  LoggerTemplate:
+    versionRequirement: '1.0.0'
+ComponentConfiguration:
+  DefaultConfiguration:
+    intervalInSecs: 10
+    timestamp: true
+    message: Hello from Logger C

@@ -5,222 +5,213 @@
 
 package com.aws.greengrass.deployment.templating;
 
+import com.amazon.aws.iot.greengrass.component.common.ComponentConfiguration;
+import com.amazon.aws.iot.greengrass.component.common.ComponentRecipe;
+import com.amazon.aws.iot.greengrass.component.common.RecipeFormatVersion;
 import com.aws.greengrass.componentmanager.ComponentStore;
-import com.aws.greengrass.componentmanager.exceptions.PackageDownloadException;
-import com.aws.greengrass.componentmanager.exceptions.PackagingException;
-import com.aws.greengrass.dependency.State;
-import com.aws.greengrass.deployment.DeploymentDocumentDownloader;
-import com.aws.greengrass.deployment.DeploymentQueue;
-import com.aws.greengrass.deployment.DeploymentStatusKeeper;
-import com.aws.greengrass.deployment.DeviceConfiguration;
-import com.aws.greengrass.deployment.model.ConfigurationUpdateOperation;
-import com.aws.greengrass.deployment.model.Deployment;
-import com.aws.greengrass.deployment.model.LocalOverrideRequest;
-import com.aws.greengrass.deployment.templating.exceptions.TemplateExecutionException;
+import com.aws.greengrass.componentmanager.exceptions.PackageLoadingException;
+import com.aws.greengrass.componentmanager.models.ComponentIdentifier;
+import com.aws.greengrass.dependency.Context;
+import com.aws.greengrass.deployment.templating.exceptions.IllegalTemplateDependencyException;
+import com.aws.greengrass.deployment.templating.exceptions.MultipleTemplateDependencyException;
 import com.aws.greengrass.deployment.templating.exceptions.RecipeTransformerException;
-import com.aws.greengrass.helper.PreloadComponentStoreHelper;
+import com.aws.greengrass.deployment.templating.exceptions.TemplateExecutionException;
 import com.aws.greengrass.integrationtests.BaseITCase;
-import com.aws.greengrass.integrationtests.util.ConfigPlatformResolver;
-import com.aws.greengrass.lifecyclemanager.Kernel;
-import com.aws.greengrass.logging.api.Logger;
-import com.aws.greengrass.logging.impl.LogManager;
-import com.aws.greengrass.status.FleetStatusService;
 import com.aws.greengrass.testcommons.testutilities.GGExtension;
-import com.aws.greengrass.testcommons.testutilities.NoOpPathOwnershipHandler;
-import com.fasterxml.jackson.databind.DeserializationFeature;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.BeforeEach;
+import com.aws.greengrass.util.NucleusPaths;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.node.TextNode;
+import com.vdurmont.semver4j.Semver;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.junit.jupiter.api.extension.ExtensionContext;
 import org.mockito.Mock;
+import org.mockito.MockedConstruction;
 import org.mockito.junit.jupiter.MockitoExtension;
-import software.amazon.awssdk.core.exception.SdkClientException;
+import org.mockito.stubbing.Answer;
 
-import java.io.File;
 import java.io.IOException;
-import java.nio.file.FileAlreadyExistsException;
+import java.net.URISyntaxException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.*;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.TimeUnit;
-import java.util.stream.Collectors;
 
-import static com.aws.greengrass.deployment.DeploymentService.DEPLOYMENT_SERVICE_TOPICS;
-import static com.aws.greengrass.deployment.DeploymentStatusKeeper.DEPLOYMENT_ID_KEY_NAME;
-import static com.aws.greengrass.deployment.DeploymentStatusKeeper.DEPLOYMENT_STATUS_KEY_NAME;
-import static com.aws.greengrass.deployment.model.Deployment.DeploymentType;
-import static com.aws.greengrass.status.FleetStatusService.FLEET_STATUS_SERVICE_TOPICS;
-import static com.aws.greengrass.testcommons.testutilities.ExceptionLogProtector.ignoreExceptionOfType;
-import static com.aws.greengrass.util.Utils.copyFolderRecursively;
-import static java.nio.file.StandardCopyOption.REPLACE_EXISTING;
-import static org.junit.jupiter.api.Assertions.assertFalse;
+import static com.amazon.aws.iot.greengrass.component.common.SerializerFactory.getRecipeSerializer;
+import static org.hamcrest.MatcherAssert.assertThat;
+import static org.hamcrest.Matchers.containsString;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.fail;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.mockConstruction;
+import static org.mockito.Mockito.when;
 
 @ExtendWith({GGExtension.class, MockitoExtension.class})
 class TemplateEngineTest extends BaseITCase {
-    private static final Logger logger = LogManager.getLogger(TemplateEngineTest.class);
-    private static final ObjectMapper OBJECT_MAPPER =
-            new ObjectMapper().configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, true);
-    private Kernel kernel;
-    private DeploymentQueue deploymentQueue;
-    private Path localStoreContentPath;
-    @Mock
-    private DeploymentDocumentDownloader deploymentDocumentDownloader;
     @Mock
     private ComponentStore mockComponentStore;
+    @Mock
+    private NucleusPaths mockNucleusPaths;
+    @Mock
+    private Context mockContext;
 
-    @BeforeEach
-    void before(ExtensionContext context) throws Exception {
-        ignoreExceptionOfType(context, PackageDownloadException.class);
-        ignoreExceptionOfType(context, SdkClientException.class);
+    @Test
+    void WHEN_a_deployment_contains_multiple_templates_and_param_files_THEN_all_of_them_are_expanded()
+            throws PackageLoadingException, TemplateExecutionException, RecipeTransformerException, IOException,
+            URISyntaxException {
+        JsonNode firstTracker = getRecipeSerializer().createObjectNode().set("tracker1", TextNode.valueOf("tracked1"));
+        JsonNode secondTracker = getRecipeSerializer().createObjectNode().set("tracker2", TextNode.valueOf("tracked2"));
+        JsonNode thirdTracker = getRecipeSerializer().createObjectNode().set("tracker3", TextNode.valueOf("tracked3"));
 
-        kernel = new Kernel();
-        kernel.getContext().put(DeploymentDocumentDownloader.class, deploymentDocumentDownloader);
-        NoOpPathOwnershipHandler.register(kernel);
-        ConfigPlatformResolver.initKernelWithMultiPlatformConfig(kernel,
-                TemplateEngineTest.class.getResource("../onlyMain.yaml"));
+        try (MockedConstruction<TransformerWrapper> mocked = mockConstruction(TransformerWrapper.class,
+                (mock, context) -> {
+                    ComponentRecipe template = (ComponentRecipe) context.arguments().get(1);
+                    ComponentIdentifier templateIdentifier = new ComponentIdentifier(template.getComponentName(),
+                            template.getComponentVersion());
+                    switch (template.getComponentName()) {
+                        case "FirstTemplate": {
+                            when(mock.expandOne(any())).thenReturn(mockTemplateExpansion(templateIdentifier, firstTracker));
+                            break;
+                        }
+                        case "SecondTemplate": {
+                            when(mock.expandOne(any())).thenReturn(mockTemplateExpansion(templateIdentifier, secondTracker));
+                            break;
+                        }
+                        case "ThirdTemplate": {
+                            when(mock.expandOne(any())).thenReturn(mockTemplateExpansion(templateIdentifier, thirdTracker));
+                            break;
+                        }
+                        default: {
+                            fail();
+                            break;
+                        }
+                    }
+                })) {
+            // validate different templates transform differently
+            Answer<Void> ans = invocation -> {
+                Object[] args = invocation.getArguments();
+                ComponentIdentifier identifier = (ComponentIdentifier) args[0];
+                ComponentRecipe generatedRecipe = getRecipeSerializer().readValue((String) args[1], ComponentRecipe.class);
+                if (identifier.getName().contains("First")) {
+                    assertEquals(generatedRecipe.getComponentConfiguration().getDefaultConfiguration(), firstTracker);
+                } else if (identifier.getName().contains("Second")) {
+                    assertEquals(generatedRecipe.getComponentConfiguration().getDefaultConfiguration(), secondTracker);
+                } else if (identifier.getName().contains("Third")) {
+                    assertEquals(generatedRecipe.getComponentConfiguration().getDefaultConfiguration(), thirdTracker);
+                } else {
+                    fail();
+                }
+                return null;
+            };
+            doAnswer(ans).when(mockComponentStore).savePackageRecipe(any(), anyString());
+            TemplateEngine templateEngine = new TemplateEngine(mockComponentStore, mockNucleusPaths, mockContext);
+            Path rootDir = Paths.get(getClass().getResource("multiple_templates_and_parameter_files").toURI());
+            Path recipeDir = rootDir.resolve("recipes");
+            Path artifactsDir = rootDir.resolve("artifacts");
 
-        // ensure deployment service starts
-        CountDownLatch deploymentServiceLatch = new CountDownLatch(1);
-        kernel.getContext().addGlobalStateChangeListener((service, oldState, newState) -> {
-            if (service.getName().equals(DEPLOYMENT_SERVICE_TOPICS) && newState.equals(State.RUNNING)) {
-                deploymentServiceLatch.countDown();
-
-            }
-        });
-        setDeviceConfig(kernel, DeviceConfiguration.DEPLOYMENT_POLLING_FREQUENCY_SECONDS, 1L);
-
-        kernel.launch();
-        assertTrue(deploymentServiceLatch.await(10, TimeUnit.SECONDS));
-        deploymentQueue =  kernel.getContext().get(DeploymentQueue.class);
-
-        FleetStatusService fleetStatusService = (FleetStatusService) kernel.locate(FLEET_STATUS_SERVICE_TOPICS);
-        fleetStatusService.getIsConnected().set(false);
-        // pre-load contents to package store
-        localStoreContentPath =
-                Paths.get(TemplateEngineTest.class.getResource(".").toURI());
-        PreloadComponentStoreHelper.preloadRecipesFromTestResourceDir(localStoreContentPath.resolve("recipes"),
-                kernel.getNucleusPaths().recipePath());
-        copyFolderRecursively(localStoreContentPath.resolve("artifacts"), kernel.getNucleusPaths().artifactPath(),
-                REPLACE_EXISTING);
+            templateEngine.process(recipeDir, artifactsDir);
+        }
     }
 
-    @AfterEach
-    void after() {
-        if (kernel != null) {
-            kernel.shutdown();
+    ComponentRecipe mockTemplateExpansion(ComponentIdentifier identifier, JsonNode trackerNode) {
+        return ComponentRecipe.builder()
+                .recipeFormatVersion(RecipeFormatVersion.JAN_25_2020)
+                .componentName(identifier.getName())
+                .componentVersion(identifier.getVersion())
+                .componentConfiguration(ComponentConfiguration.builder().defaultConfiguration(trackerNode).build())
+                .build();
+    }
+
+    @Test
+    void WHEN_a_deployment_contains_non_templated_components_THEN_nothing_happens_to_them()
+            throws PackageLoadingException, TemplateExecutionException, RecipeTransformerException, IOException,
+            URISyntaxException {
+        ComponentRecipe mockedReturn = ComponentRecipe.builder()
+                .recipeFormatVersion(RecipeFormatVersion.JAN_25_2020)
+                .componentName("Expanded")
+                .componentVersion(new Semver("1.0.0"))
+                .build();
+        try (MockedConstruction<TransformerWrapper> mocked = mockConstruction(TransformerWrapper.class,
+                (mock, context) -> when(mock.expandOne(any())).thenReturn(mockedReturn))) {
+            // validate only parameter files are transformed
+            Answer<Void> ans = invocation -> {
+                Object[] args = invocation.getArguments();
+                ComponentIdentifier identifier = (ComponentIdentifier) args[0];
+                if ("RegularRecipe".equals(identifier.getName())) {
+                    fail("A new version of a non-templated component was saved to component store");
+                }
+                return null;
+            };
+            doAnswer(ans).when(mockComponentStore).savePackageRecipe(any(), anyString());
+            TemplateEngine templateEngine = new TemplateEngine(mockComponentStore, mockNucleusPaths, mockContext);
+            Path rootDir = Paths.get(getClass().getResource("multiple_templates_and_parameter_files").toURI());
+            Path recipeDir = rootDir.resolve("recipes");
+            Path artifactsDir = rootDir.resolve("artifacts");
+
+            assertTrue(Files.exists(recipeDir.resolve("RegularRecipe-1.0.0.yaml")));
+
+            templateEngine.process(recipeDir, artifactsDir);
         }
     }
 
     @Test
-    void integTest() throws Exception {
-
-        CountDownLatch firstDeploymentCDL = new CountDownLatch(1);
-        DeploymentStatusKeeper deploymentStatusKeeper = kernel.getContext().get(DeploymentStatusKeeper.class);
-        deploymentStatusKeeper.registerDeploymentStatusConsumer(DeploymentType.LOCAL, (status) -> {
-            if(status.get(DEPLOYMENT_ID_KEY_NAME).equals("firstDeployment") &&
-                    status.get(DEPLOYMENT_STATUS_KEY_NAME).equals("FAILED")){
-                firstDeploymentCDL.countDown();
-            }
-            return true;
-        },"TemplateEngineTest" );
-
-        String recipeDir = localStoreContentPath.resolve("recipes").toAbsolutePath().toString();
-        String artifactsDir = localStoreContentPath.resolve("artifacts").toAbsolutePath().toString();
-
-        Map<String, String> componentsToMerge = new HashMap<>();
-        componentsToMerge.put("A", "1.0.0");
-//        componentsToMerge.put("ATemplate", "1.0.0");
-
-        Map<String, ConfigurationUpdateOperation> updateConfig = new HashMap<>();
-
-        LocalOverrideRequest request = LocalOverrideRequest.builder().requestId("firstDeployment")
-                .componentsToMerge(componentsToMerge)
-                .requestTimestamp(System.currentTimeMillis())
-                .configurationUpdate(updateConfig)
-                .recipeDirectoryPath(recipeDir).artifactsDirectoryPath(artifactsDir).build();
-
-        submitLocalDocument(request);
-
-        assertFalse(firstDeploymentCDL.await(10, TimeUnit.SECONDS), "First deployment did not succeed");
-    }
-
-    @Test
-    @SuppressWarnings("PMD.PrematureDeclaration")
-    void unitTest() throws PackagingException, TemplateExecutionException, IOException, RecipeTransformerException {
-        CountDownLatch firstDeploymentCDL = new CountDownLatch(1);
-        DeploymentStatusKeeper deploymentStatusKeeper = kernel.getContext().get(DeploymentStatusKeeper.class);
-        deploymentStatusKeeper.registerDeploymentStatusConsumer(DeploymentType.LOCAL, (status) -> {
-            if(status.get(DEPLOYMENT_ID_KEY_NAME).equals("firstDeployment") &&
-                    status.get(DEPLOYMENT_STATUS_KEY_NAME).equals("SUCCEEDED")){
-                firstDeploymentCDL.countDown();
-            }
-            return true;
-        },"TemplateEngineTest" );
-
-        Path recipeDir = localStoreContentPath.resolve("recipes").toAbsolutePath();
-        Path recipeWorkDir = localStoreContentPath.resolve("_recipes_out");
-        try {
-            Files.createDirectory(recipeWorkDir);
-        } catch (FileAlreadyExistsException e) {}
-
-        Path artifactsDir = localStoreContentPath.resolve("artifacts").toAbsolutePath();
-        Path artifactsWorkDir = localStoreContentPath.resolve("_artifacts_out");
-        try {
-            Files.createDirectory(artifactsWorkDir);
-        } catch (FileAlreadyExistsException e) {}
-
-        // if there are files, delete them first
-        for (File file : Objects.requireNonNull(recipeWorkDir.toFile().listFiles())) {
-            if (!file.delete()) {
-                throw new IOException("Could not delete work file " + file.getAbsolutePath());
-            }
-        }
-        Files.walk(artifactsWorkDir).collect(Collectors.toList()).forEach(source -> source.toFile().delete());
-
-        // copy files to work directories
-        for (File file : Objects.requireNonNull(recipeDir.toFile().listFiles())) {
-            System.out.println(file.getPath());
-            System.out.println(recipeWorkDir.resolve(file.getName()));
-            Files.copy(Paths.get(file.getPath()), recipeWorkDir.resolve(file.getName()));
-        }
-        Files.walk(artifactsDir).collect(Collectors.toList()).forEach(source -> {
-            try {
-                Files.copy(source,
-                        artifactsWorkDir.resolve(artifactsDir.relativize(source)), REPLACE_EXISTING);
-            } catch (IOException e) {
-                logger.atWarn().setCause(e).log();
-            }
-        });
-
-        TemplateEngine templateEngine = new TemplateEngine(mockComponentStore, kernel.getNucleusPaths(), kernel.getContext());
-        templateEngine.process();
-    }
-
-    private void submitLocalDocument(LocalOverrideRequest request) throws Exception {
-        Deployment deployment = new Deployment(OBJECT_MAPPER.writeValueAsString(request), DeploymentType.LOCAL, request.getRequestId());
-        deploymentQueue.offer(deployment);
-    }
-
-    void WHEN_components_are_loaded_THEN_build_queue_is_populated() {
-
-    }
-
-    void WHEN_provided_with_bad_load_dependencies_THEN_throw_error() {
+    void WHEN_provided_with_bad_load_dependencies_THEN_throw_error() throws URISyntaxException{
         // multiple dependency
+        TemplateEngine templateEngine = new TemplateEngine(mockComponentStore, mockNucleusPaths, mockContext);
+        Path rootDir = Paths.get(getClass().getResource("multiple_dependency").toURI());
+        Path multipleDepRecipeDir = rootDir.resolve("recipes");
+        Path multipleDepArtifactsDir = rootDir.resolve("artifacts");
+        MultipleTemplateDependencyException ex = assertThrows(MultipleTemplateDependencyException.class,
+                () -> templateEngine.process(multipleDepRecipeDir, multipleDepArtifactsDir));
+        assertThat(ex.getMessage(), containsString("has multiple template dependencies"));
+
         // templates depending on templates
+        rootDir = Paths.get(getClass().getResource("template_with_dependency").toURI());
+        Path templateDepRecipeDir = rootDir.resolve("recipes");
+        Path templateDepArtifactsDir = rootDir.resolve("artifacts");
+        IllegalTemplateDependencyException ex2 = assertThrows(IllegalTemplateDependencyException.class,
+                () -> templateEngine.process(templateDepRecipeDir, templateDepArtifactsDir));
+        assertThat(ex2.getMessage(), containsString("Illegal dependency for template"));
     }
 
-    void WHEN_expansion_called_then_component_store_is_involved() {
+    @Test
+    void GIVEN_provided_templates_IF_templates_have_lifecycle_THEN_throw_exception() throws URISyntaxException {
+        TemplateEngine templateEngine = new TemplateEngine(mockComponentStore, mockNucleusPaths, mockContext);
+        Path rootDir = Paths.get(getClass().getResource("template_with_lifecycle").toURI());
+        Path artifactsDir = rootDir.resolve("artifacts");
 
+        // manifests::lifecycle
+        Path manifestRecipeDir = rootDir.resolve("recipes_manifests");
+        RecipeTransformerException ex = assertThrows(RecipeTransformerException.class,
+                () -> templateEngine.process(manifestRecipeDir, artifactsDir));
+        assertThat(ex.getMessage(), containsString("Templates cannot have non-empty lifecycle"));
+
+        // lifecycle
+        Path lifecycleRecipeDir = rootDir.resolve("recipes_lifecycle");
+        RecipeTransformerException ex2 = assertThrows(RecipeTransformerException.class,
+                () -> templateEngine.process(lifecycleRecipeDir, artifactsDir));
+        assertThat(ex2.getMessage(), containsString("Templates cannot have non-empty lifecycle"));
     }
 
-    void GIVEN_expanded_templates_THEN_template_components_are_deleted() {
+    @Test
+    void GIVEN_param_files_loaded_IF_desired_template_doesnt_exist_THEN_throw_package_loading_exception()
+            throws URISyntaxException {
+        TemplateEngine templateEngine = new TemplateEngine(mockComponentStore, mockNucleusPaths, mockContext);
+        Path rootDir = Paths.get(getClass().getResource("desired_template_doesnt_exist").toURI());
+        Path artifactsDir = rootDir.resolve("artifacts");
 
+        // version is incompatible
+        Path incompatibleRecipeDir = rootDir.resolve("recipes_incompatible");
+        IllegalTemplateDependencyException ex = assertThrows(IllegalTemplateDependencyException.class,
+                () -> templateEngine.process(incompatibleRecipeDir, artifactsDir));
+        assertThat(ex.getMessage(), containsString("can't be found locally. Requirement is"));
+
+        // template is missing
+        Path missingRecipeDir = rootDir.resolve("recipes_missing");
+        IllegalTemplateDependencyException ex2 = assertThrows(IllegalTemplateDependencyException.class,
+                () -> templateEngine.process(missingRecipeDir, artifactsDir));
+        assertThat(ex2.getMessage(), containsString("can't be found locally. Requirement is"));
     }
 }
-

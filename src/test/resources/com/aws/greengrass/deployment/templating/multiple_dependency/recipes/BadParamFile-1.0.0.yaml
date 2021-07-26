@@ -1,13 +1,10 @@
 ---
 RecipeFormatVersion: '2020-01-25'
-ComponentName: A
+ComponentName: BadParamFile
 ComponentPublisher: Me
 ComponentVersion: '1.0.0'
 ComponentDependencies:
   ATemplate:
     VersionRequirement: '1.0.0'
-ComponentConfiguration:
-  DefaultConfiguration:
-    param1: This is a test
-    param2: val 2
-    resetParam2: jeje
+  BTemplate:
+    VersionRequirement: '4.2.0'

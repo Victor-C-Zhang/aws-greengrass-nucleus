@@ -1,0 +1,7 @@
+---
+RecipeFormatVersion: '2020-01-25'
+ComponentName: RegularRecipe
+ComponentType: aws.greengrass.generic
+ComponentPublisher: Me
+ComponentVersion: '1.0.0'
+ComponentDescription: This is not a templated component so should not be modified during templating

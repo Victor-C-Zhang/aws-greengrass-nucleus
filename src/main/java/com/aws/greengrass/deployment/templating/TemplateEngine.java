@@ -93,6 +93,7 @@ public class TemplateEngine {
 
         loadComponents(recipeDirectoryPath);
         // TODO: resolve versioning, download dependencies if necessary
+        ensureTemplatesHaveNoLifecycle();
         expandAll(artifactsDirectoryPath);
 
         // cleanup state
@@ -166,8 +167,12 @@ public class TemplateEngine {
 
                 // assume we're provided all the right components and the versions match properly.
                 // TODO: allow for dependency resolution of template versions
-                ComponentIdentifier templateId =
-                        mapOfTemplateNameToTemplateIdentifier.get(dependencyEntry.getKey());
+                ComponentIdentifier templateId = mapOfTemplateNameToTemplateIdentifier.get(dependencyEntry.getKey());
+                if (templateId == null) {
+                    throw new IllegalTemplateDependencyException("Component " + identifier.getName() + " depends on a "
+                            + "version of " + dependencyEntry.getKey() + " that can't be found locally. Requirement is "
+                            + dependencyEntry.getValue().getVersionRequirement());
+                }
                 if (!dependencyEntry.getValue().getVersionRequirement().isSatisfiedBy(templateId.getVersion())) {
                     throw new IllegalTemplateDependencyException("Component " + identifier.getName() + " depends on a"
                             + " version of " + templateId.getName() + " that can't be found locally. Requirement is "
@@ -179,6 +184,26 @@ public class TemplateEngine {
                 // add param file to build queue for template
                 mapOfTemplateToComponentsToBeBuilt.putIfAbsent(dependencyEntry.getKey(), new ArrayList<>());
                 mapOfTemplateToComponentsToBeBuilt.get(dependencyEntry.getKey()).add(identifier);
+            }
+        }
+    }
+
+    // assert templates have no lifecycle. TODO: do this in the nucleus, similar to provisioning plugin
+    void ensureTemplatesHaveNoLifecycle() throws RecipeTransformerException {
+        for (Map.Entry<ComponentIdentifier, ComponentRecipe> templateEntry :
+                mapOfComponentIdentifierToRecipe.entrySet()) {
+            ComponentRecipe templateRecipe = mapOfComponentIdentifierToRecipe.get(templateEntry.getKey());
+            for (PlatformSpecificManifest manifest : templateRecipe.getManifests()) {
+                if (manifest.getLifecycle() != null && manifest.getLifecycle().size() != 0) {
+                    throw new RecipeTransformerException("Templates cannot have non-empty lifecycle. "
+                            + templateEntry.getKey().getName() + " has a lifecycle map with "
+                            + manifest.getLifecycle().size() + " key/value pairs.");
+                }
+            }
+            if (templateRecipe.getLifecycle() != null && templateRecipe.getLifecycle().size() != 0) {
+                throw new RecipeTransformerException("Templates cannot have non-empty lifecycle. "
+                        + templateEntry.getKey().getName() + " has a lifecycle map with "
+                        + templateRecipe.getLifecycle().size() + " key/value pairs.");
             }
         }
     }
@@ -197,22 +222,6 @@ public class TemplateEngine {
             if (template == null) {
                 throw new PackageLoadingException("Could not get template component " + entry.getKey());
             }
-
-            // assert templates have no lifecycle. TODO: do this in the nucleus, similar to provisioning plugin
-            ComponentRecipe templateRecipe = mapOfComponentIdentifierToRecipe.get(template);
-            for (PlatformSpecificManifest manifest : templateRecipe.getManifests()) {
-                if (manifest.getLifecycle() != null && manifest.getLifecycle().size() != 0) {
-                    throw new RecipeTransformerException("Templates cannot have non-empty lifecycle. "
-                            + template.getName() + " has a lifecycle map with "
-                            + manifest.getLifecycle().size() + " key/value pairs.");
-                }
-            }
-            if (templateRecipe.getLifecycle() != null && templateRecipe.getLifecycle().size() != 0) {
-                throw new RecipeTransformerException("Templates cannot have non-empty lifecycle. "
-                        + template.getName() + " has a lifecycle map with "
-                        + templateRecipe.getLifecycle().size() + " key/value pairs.");
-            }
-
             Path templateJarPath = artifactsDirectoryPath.resolve(template.getName())
                     .resolve(template.getVersion().toString()).resolve(PARSER_JAR);
             expandAllForTemplate(template, templateJarPath, entry.getValue());

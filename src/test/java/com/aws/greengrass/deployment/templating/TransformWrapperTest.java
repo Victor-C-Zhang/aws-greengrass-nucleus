@@ -9,7 +9,6 @@ import com.amazon.aws.iot.greengrass.component.common.ComponentRecipe;
 import com.aws.greengrass.dependency.Context;
 import com.aws.greengrass.dependency.EZPlugins;
 import com.aws.greengrass.deployment.templating.exceptions.RecipeTransformerException;
-import com.aws.greengrass.testcommons.testutilities.GGExtension;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -28,7 +27,7 @@ import static org.hamcrest.Matchers.containsString;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.when;
 
-@ExtendWith({MockitoExtension.class, GGExtension.class})
+@ExtendWith(MockitoExtension.class)
 public class TransformWrapperTest {
     @Mock
     Context mockContext;
@@ -64,18 +63,19 @@ public class TransformWrapperTest {
         Path noImplemented = Paths.get(getClass().getResource("no-implemented-transformer.jar").toURI());
         RecipeTransformerException ex = assertThrows(RecipeTransformerException.class,
                 () -> new TransformerWrapper(noImplemented, mockComponentRecipe, mockContext));
+        System.out.println(ex.getMessage());
         assertThat(ex.getMessage(), containsString("Could not find a candidate transformer class for template"));
 
         // more than one transformer class found
         Path multipleTransformer = Paths.get(getClass().getResource("multiple-transformer.jar").toURI());
-        ex = assertThrows(RecipeTransformerException.class,
+        RecipeTransformerException ex2 = assertThrows(RecipeTransformerException.class,
                 () -> new TransformerWrapper(multipleTransformer, mockComponentRecipe, mockContext));
-        assertThat(ex.getMessage(), containsString("Found more than one candidate transformer class"));
+        assertThat(ex2.getMessage(), containsString("Found more than one candidate transformer class"));
 
         // something goes wrong with transformer init
         Path errorTransformer = Paths.get(getClass().getResource("error-transformer.jar").toURI());
-        ex = assertThrows(RecipeTransformerException.class,
+        RecipeTransformerException ex3 = assertThrows(RecipeTransformerException.class,
                 () -> new TransformerWrapper(errorTransformer, mockComponentRecipe, mockContext));
-        assertThat(ex.getMessage(), containsString("Could not instantiate the transformer"));
+        assertThat(ex3.getMessage(), containsString("Could not instantiate the transformer"));
     }
 }
