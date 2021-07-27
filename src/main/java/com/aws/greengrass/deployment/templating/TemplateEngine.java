@@ -190,19 +190,19 @@ public class TemplateEngine {
 
     // assert templates have no lifecycle. TODO: do this in the nucleus, similar to provisioning plugin
     void ensureTemplatesHaveNoLifecycle() throws RecipeTransformerException {
-        for (Map.Entry<ComponentIdentifier, ComponentRecipe> templateEntry :
-                mapOfComponentIdentifierToRecipe.entrySet()) {
-            ComponentRecipe templateRecipe = mapOfComponentIdentifierToRecipe.get(templateEntry.getKey());
+        for (Map.Entry<String, ComponentIdentifier> templateEntry :
+                mapOfTemplateNameToTemplateIdentifier.entrySet()) {
+            ComponentRecipe templateRecipe = mapOfComponentIdentifierToRecipe.get(templateEntry.getValue());
             for (PlatformSpecificManifest manifest : templateRecipe.getManifests()) {
                 if (manifest.getLifecycle() != null && manifest.getLifecycle().size() != 0) {
                     throw new RecipeTransformerException("Templates cannot have non-empty lifecycle. "
-                            + templateEntry.getKey().getName() + " has a lifecycle map with "
+                            + templateEntry.getValue().getName() + " has a lifecycle map with "
                             + manifest.getLifecycle().size() + " key/value pairs.");
                 }
             }
             if (templateRecipe.getLifecycle() != null && templateRecipe.getLifecycle().size() != 0) {
                 throw new RecipeTransformerException("Templates cannot have non-empty lifecycle. "
-                        + templateEntry.getKey().getName() + " has a lifecycle map with "
+                        + templateEntry.getValue().getName() + " has a lifecycle map with "
                         + templateRecipe.getLifecycle().size() + " key/value pairs.");
             }
         }

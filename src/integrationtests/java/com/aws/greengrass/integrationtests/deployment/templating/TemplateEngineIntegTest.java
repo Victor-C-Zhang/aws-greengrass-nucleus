@@ -66,7 +66,7 @@ public class TemplateEngineIntegTest extends BaseITCase {
     private DeploymentDocumentDownloader deploymentDocumentDownloader;
 
     @BeforeEach
-    void before(ExtensionContext context) throws Exception {
+    void beforeEach(ExtensionContext context) throws Exception {
         ignoreExceptionOfType(context, PackageDownloadException.class);
         ignoreExceptionOfType(context, SdkClientException.class);
 
@@ -127,6 +127,7 @@ public class TemplateEngineIntegTest extends BaseITCase {
         componentsToMerge.put("LoggerA", "1.0.0");
         componentsToMerge.put("LoggerB", "1.0.0");
         componentsToMerge.put("LoggerC", "1.0.0");
+        componentsToMerge.put("A", "1.0.0");
         //        componentsToMerge.put("LoggerTemplate", "1.0.0");
 
         Map<String, ConfigurationUpdateOperation> updateConfig = new HashMap<>();
@@ -166,6 +167,11 @@ public class TemplateEngineIntegTest extends BaseITCase {
                             assertEquals(
                                     "for ((i=30; i>0; i--)); do\n  sleep 10 &\n  echo Hello from Logger C ; echo "
                                             + "`date`\n  wait\ndone",
+                                    recipe.getManifests().get(0).getLifecycle().get("run"));
+                            break;
+                        }
+                        case "A": {
+                            assertEquals("echo Param1: hello Param2: world ResetParam1: hehe ResetParam2: hoho",
                                     recipe.getManifests().get(0).getLifecycle().get("run"));
                             break;
                         }

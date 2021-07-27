@@ -25,7 +25,8 @@ public class TransformerWrapper {
      * @param context                       the Context instance.
      * @throws RecipeTransformerException   if something goes wrong instantiating the transformer.
      */
-    @SuppressWarnings({"PMD.AvoidCatchingThrowable", "PMD.CloseResource", "PMD.AvoidCatchingGenericException"})
+    @SuppressWarnings({"PMD.AvoidCatchingThrowable", "PMD.CloseResource", "PMD.AvoidCatchingGenericException",
+            "PMD.SystemPrintln"})
     public TransformerWrapper(Path pathToExecutable, ComponentRecipe template, Context context)
             throws RecipeTransformerException {
         if (!Files.exists(pathToExecutable)) {
@@ -33,9 +34,11 @@ public class TransformerWrapper {
                     + pathToExecutable);
         }
         EZPlugins ezPlugins = context.get(EZPlugins.class);
+        System.out.println(ezPlugins);
         AtomicReference<Class<RecipeTransformer>> transformerClass = new AtomicReference<>();
         try {
             ezPlugins.loadPlugin(pathToExecutable, sc -> sc.matchSubclassesOf(RecipeTransformer.class, c -> {
+                System.out.println(c.getName());
                 if (transformerClass.get() != null) {
                     throw new RuntimeException("Found more than one candidate transformer class.");
                 }
