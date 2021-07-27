@@ -22,7 +22,7 @@ import java.util.Map;
 
 import static com.amazon.aws.iot.greengrass.component.common.SerializerFactory.getRecipeSerializer;
 
-public class LoggerTransformer {
+public class LoggerTransformer extends RecipeTransformer {
     private static final String PARAMETER_SCHEMA = "intervalInSecs:\n" + "  type: number\n" + "  required: true\n" +
             "timestamp:\n" + "  type: boolean\n" + "  required: false\n" + "message:\n" + "  type: string\n"
             + "  required: false";
@@ -40,12 +40,12 @@ public class LoggerTransformer {
     public ComponentRecipe transform(ComponentRecipe paramFile, JsonNode componentParams)
             throws RecipeTransformerException {
         String runScript =
-                "for ((i=30; i>0; i--)); do\n"
-              + "  sleep " + componentParams.get("intervalInSecs").asInt() + " &\n"
+//                "for ((i=30; i>0; i--)); do\n" +
+                "  sleep " + componentParams.get("intervalInSecs").asInt() + " &&\n"
               + "  echo " + componentParams.get("message").asText()
-              + (componentParams.get("timestamp").asBoolean() ? " ; echo `date`\n" : "\n")
-              + "  wait\n"
-              + "done";
+              + (componentParams.get("timestamp").asBoolean() ? " ; echo `date`\n" : "\n");
+//              + "  wait\n"
+//              + "done";
 
         Map<String, Object> lifecycle = new HashMap<>();
         lifecycle.put("run", runScript);

@@ -208,21 +208,19 @@ public class TemplateEngineIntegTest extends BaseITCase {
                     switch (recipe.getComponentName()) {
                         case "LoggerA": {
                             assertEquals(
-                                    "for ((i=30; i>0; i--)); do\n  sleep 5 &\n  echo Logger A says hi\n  wait\ndone",
+                                    "  sleep 5 &&\n  echo Logger A says hi\n",
                                     recipe.getManifests().get(0).getLifecycle().get("run"));
                             break;
                         }
                         case "LoggerB": {
                             assertEquals(
-                                    "for ((i=30; i>0; i--)); do\n  sleep 3 &\n  echo Ping pong its a default "
-                                            + "message ; echo `date`\n  wait\ndone",
+                                    "  sleep 3 &&\n  echo Ping pong its a default message ; echo `date`\n",
                                     recipe.getManifests().get(0).getLifecycle().get("run"));
                             break;
                         }
                         case "LoggerC": {
                             assertEquals(
-                                    "for ((i=30; i>0; i--)); do\n  sleep 10 &\n  echo Hello from Logger C ; echo "
-                                            + "`date`\n  wait\ndone",
+                                    "  sleep 10 &&\n  echo Hello from Logger C ; echo `date`\n",
                                     recipe.getManifests().get(0).getLifecycle().get("run"));
                             break;
                         }

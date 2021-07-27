@@ -19,7 +19,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 
-public class EchoTransformer {
+public class EchoTransformer extends RecipeTransformer {
     private static final String COMPONENT_DESCRIPTION = "Component expanded with EchoTransformer";
     private static final String COMPONENT_PUBLISHER = "Me";
 
