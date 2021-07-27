@@ -5,18 +5,10 @@ componentPublisher: Me
 componentVersion: '1.0.0'
 ComponentConfiguration:
   DefaultConfiguration:
-    parameters:
-      resetParam1: hehe
     parameterSchema:
       param1:
         type: string
         required: true
       param2:
-        type: string
-        required: true
-      resetParam1:
-        type: string
-        required: false
-      resetParam2:
         type: string
         required: true

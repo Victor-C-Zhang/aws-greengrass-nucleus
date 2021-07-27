@@ -22,7 +22,7 @@ import java.util.Map;
 
 import static com.amazon.aws.iot.greengrass.component.common.SerializerFactory.getRecipeSerializer;
 
-public class LoggerTransformer extends RecipeTransformer {
+public class LoggerTransformer {
     private static final String PARAMETER_SCHEMA = "intervalInSecs:\n" + "  type: number\n" + "  required: true\n" +
             "timestamp:\n" + "  type: boolean\n" + "  required: false\n" + "message:\n" + "  type: string\n"
             + "  required: false";

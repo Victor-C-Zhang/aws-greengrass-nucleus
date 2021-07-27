@@ -143,6 +143,62 @@ public class TemplateEngineIntegTest extends BaseITCase {
         assertTrue(firstDeploymentCDL.await(10, TimeUnit.SECONDS), "Templating deployment did not succeed");
     }
 
+    @Test
+    void multipleDeployment() throws Exception {
+        CountDownLatch firstDeploymentCDL = new CountDownLatch(1);
+        CountDownLatch secondDeploymentCDL = new CountDownLatch(1);
+        DeploymentStatusKeeper deploymentStatusKeeper = kernel.getContext().get(DeploymentStatusKeeper.class);
+        deploymentStatusKeeper.registerDeploymentStatusConsumer(Deployment.DeploymentType.LOCAL, (status) -> {
+            if (status.get(DEPLOYMENT_ID_KEY_NAME).equals("templatingDeployment") &&
+                    status.get(DEPLOYMENT_STATUS_KEY_NAME).equals("SUCCEEDED")){
+                verifyLoggerDeployment();
+                firstDeploymentCDL.countDown();
+            } else if (status.get(DEPLOYMENT_ID_KEY_NAME).equals("secondTemplatingDeployment") &&
+                    status.get(DEPLOYMENT_STATUS_KEY_NAME).equals("SUCCEEDED")){
+                verifyLoggerDeployment();
+                secondDeploymentCDL.countDown();
+            }
+            return true;
+        },"TemplateEngineIntegTest");
+
+        String recipeDir = getClass().getResource("recipes").getPath();
+        String artifactsDir = getClass().getResource("artifacts").getPath();
+        Map<String, String> componentsToMerge = new HashMap<>();
+        componentsToMerge.put("LoggerA", "1.0.0");
+        componentsToMerge.put("LoggerB", "1.0.0");
+        componentsToMerge.put("LoggerC", "1.0.0");
+//        componentsToMerge.put("A", "1.0.0");
+        //        componentsToMerge.put("LoggerTemplate", "1.0.0");
+
+        Map<String, ConfigurationUpdateOperation> updateConfig = new HashMap<>();
+
+        LocalOverrideRequest request = LocalOverrideRequest.builder().requestId("templatingDeployment")
+                .componentsToMerge(componentsToMerge)
+                .requestTimestamp(System.currentTimeMillis())
+                .configurationUpdate(updateConfig)
+                .recipeDirectoryPath(recipeDir).artifactsDirectoryPath(artifactsDir).build();
+
+        submitLocalDocument(request);
+
+        assertTrue(firstDeploymentCDL.await(10, TimeUnit.SECONDS), "Templating deployment did not succeed");
+
+
+        Map<String, String> newComponentsToMerge = new HashMap<>();
+//        componentsToMerge.put("LoggerA", "1.0.0");
+//        componentsToMerge.put("LoggerB", "1.0.0");
+//        componentsToMerge.put("LoggerC", "1.0.0");
+        componentsToMerge.put("A", "1.0.0");
+
+        LocalOverrideRequest secondRequest = LocalOverrideRequest.builder().requestId("secondTemplatingDeployment")
+                .componentsToMerge(newComponentsToMerge)
+                .requestTimestamp(System.currentTimeMillis())
+                .configurationUpdate(updateConfig)
+                .recipeDirectoryPath(recipeDir).artifactsDirectoryPath(artifactsDir).build();
+
+        submitLocalDocument(secondRequest);
+        assertTrue(secondDeploymentCDL.await(10, TimeUnit.SECONDS), "Second templating deployment did not succeed");
+    }
+
     // reach into component store to verify
     private void verifyLoggerDeployment() {
         try (Stream<Path> files = Files.walk(kernel.getNucleusPaths().recipePath())) {
@@ -171,7 +227,7 @@ public class TemplateEngineIntegTest extends BaseITCase {
                             break;
                         }
                         case "A": {
-                            assertEquals("echo Param1: hello Param2: world ResetParam1: hehe ResetParam2: hoho",
+                            assertEquals("echo Param1: hello Param2: world",
                                     recipe.getManifests().get(0).getLifecycle().get("run"));
                             break;
                         }

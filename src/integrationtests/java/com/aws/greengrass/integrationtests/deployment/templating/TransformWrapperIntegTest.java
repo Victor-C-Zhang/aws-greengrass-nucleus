@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-package com.aws.greengrass.integrationtests.mqttclient;
+package com.aws.greengrass.integrationtests.deployment.templating;
 
 import com.amazon.aws.iot.greengrass.component.common.ComponentRecipe;
 import com.amazon.aws.iot.greengrass.component.common.RecipeFormatVersion;
@@ -26,7 +26,7 @@ import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.containsString;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
-public class AAATransformWrapperIntegTest extends BaseITCase {
+public class TransformWrapperIntegTest extends BaseITCase {
     private Context context;
     private ComponentRecipe templateRecipe;
 
@@ -52,8 +52,7 @@ public class AAATransformWrapperIntegTest extends BaseITCase {
     @Test
     void GIVEN_jar_with_no_transformer_WHEN_try_instantiation_THEN_throw_transformer_exception()
             throws URISyntaxException {
-        Path noImplemented =
-                Paths.get(getClass().getResource("../deployment/templating/no-implemented-transformer.jar").toURI());
+        Path noImplemented = Paths.get(getClass().getResource("no-implemented-transformer.jar").toURI());
         RecipeTransformerException ex = assertThrows(RecipeTransformerException.class,
                 () -> new TransformerWrapper(noImplemented, templateRecipe, context));
         System.out.println(ex.getMessage());
@@ -63,7 +62,7 @@ public class AAATransformWrapperIntegTest extends BaseITCase {
     @Test
     void GIVEN_jar_with_more_than_one_transformer_WHEN_try_instantiation_THEN_throw_exception()
             throws URISyntaxException {
-        Path multipleTransformer = Paths.get(getClass().getResource("../deployment/templating/multiple-transformer.jar").toURI());
+        Path multipleTransformer = Paths.get(getClass().getResource("multiple-transformer.jar").toURI());
         RecipeTransformerException ex2 = assertThrows(RecipeTransformerException.class,
                 () -> new TransformerWrapper(multipleTransformer, templateRecipe, context));
         assertThat(ex2.getMessage(), containsString("Found more than one candidate transformer class"));
@@ -72,7 +71,7 @@ public class AAATransformWrapperIntegTest extends BaseITCase {
     void GIVEN_jar_with_faulty_transformer_WHEN_try_instantiation_THEN_throw_exception()
             throws URISyntaxException {
         // something goes wrong with transformer init
-        Path errorTransformer = Paths.get(getClass().getResource("../deployment/templating/error-transformer.jar").toURI());
+        Path errorTransformer = Paths.get(getClass().getResource("error-transformer.jar").toURI());
         RecipeTransformerException ex3 = assertThrows(RecipeTransformerException.class,
                 () -> new TransformerWrapper(errorTransformer, templateRecipe, context));
         assertThat(ex3.getMessage(), containsString("Could not instantiate the transformer"));

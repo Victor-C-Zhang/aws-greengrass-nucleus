@@ -10,4 +10,3 @@ ComponentConfiguration:
   DefaultConfiguration:
     param1: hello
     param2: world
-    resetParam2: hoho

@@ -110,7 +110,8 @@ public class RecipeTransformerTest {
         stringParamNotRequired.replace("stringParam",
                 getRecipeSerializer().readTree("type: string\nrequired: false"));
         assertThrows(TemplateParameterException.class, () ->
-                new FakeRecipeTransformer().initTemplateRecipe(getTemplate(stringParamNotRequired, defaultTemplateDefaultParams)));
+                new FakeRecipeTransformer()
+                        .initTemplateRecipe(getTemplate(stringParamNotRequired, defaultTemplateDefaultParams)));
     }
 
     @Test
@@ -254,7 +255,7 @@ public class RecipeTransformerTest {
         return wrapperRecipe.getComponentConfiguration().getDefaultConfiguration();
     }
 
-    static class FakeRecipeTransformer extends RecipeTransformer {
+    private static class FakeRecipeTransformer extends RecipeTransformer {
         @Override
         protected JsonNode initTemplateSchema() throws TemplateParameterException {
             try {
