@@ -31,7 +31,7 @@ public class TransformWrapperTest {
 
     @Test
     void WHEN_given_bad_path_THEN_throw_error() throws URISyntaxException {
-        Path goodPath = Paths.get(getClass().getResource("no-implemented-transformer.jar").toURI());
+        Path goodPath = Paths.get(getClass().getResource(".").toURI());
         Path badPath = goodPath.resolveSibling("nonexistent_file.txt");
         RecipeTransformerException ex = assertThrows(RecipeTransformerException.class,
                 () -> new TransformerWrapper(badPath, mockComponentRecipe, mockContext));
