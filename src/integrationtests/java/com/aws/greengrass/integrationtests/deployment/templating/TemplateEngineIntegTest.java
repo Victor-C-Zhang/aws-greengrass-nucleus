@@ -62,6 +62,7 @@ public class TemplateEngineIntegTest extends BaseITCase {
             new ObjectMapper().configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, true);
     private Kernel kernel;
     private DeploymentQueue deploymentQueue;
+    private Path localStoreContentPath;
     @Mock
     private DeploymentDocumentDownloader deploymentDocumentDownloader;
 
@@ -93,7 +94,7 @@ public class TemplateEngineIntegTest extends BaseITCase {
         FleetStatusService fleetStatusService = (FleetStatusService) kernel.locate(FLEET_STATUS_SERVICE_TOPICS);
         fleetStatusService.getIsConnected().set(false);
         // pre-load contents to package store
-        Path localStoreContentPath = Paths.get(TemplateEngineIntegTest.class.getResource(".").toURI());
+        localStoreContentPath = Paths.get(TemplateEngineIntegTest.class.getResource(".").toURI());
         PreloadComponentStoreHelper.preloadRecipesFromTestResourceDir(localStoreContentPath.resolve("recipes"),
                 kernel.getNucleusPaths().recipePath());
         copyFolderRecursively(localStoreContentPath.resolve("artifacts"), kernel.getNucleusPaths().artifactPath(),
@@ -120,8 +121,8 @@ public class TemplateEngineIntegTest extends BaseITCase {
             return true;
         },"TemplateEngineIntegTest");
 
-        String recipeDir = getClass().getResource("recipes").getPath();
-        String artifactsDir = getClass().getResource("artifacts").getPath();
+        String recipeDir = localStoreContentPath.resolve("recipes").toAbsolutePath().toString();
+        String artifactsDir = localStoreContentPath.resolve("artifacts").toAbsolutePath().toString();
 
         Map<String, String> componentsToMerge = new HashMap<>();
         componentsToMerge.put("LoggerA", "1.0.0");
@@ -161,8 +162,8 @@ public class TemplateEngineIntegTest extends BaseITCase {
             return true;
         },"TemplateEngineIntegTest");
 
-        String recipeDir = getClass().getResource("recipes").getPath();
-        String artifactsDir = getClass().getResource("artifacts").getPath();
+        String recipeDir = localStoreContentPath.resolve("recipes").toAbsolutePath().toString();
+        String artifactsDir = localStoreContentPath.resolve("artifacts").toAbsolutePath().toString();
         Map<String, String> componentsToMerge = new HashMap<>();
         componentsToMerge.put("LoggerA", "1.0.0");
         componentsToMerge.put("LoggerB", "1.0.0");
