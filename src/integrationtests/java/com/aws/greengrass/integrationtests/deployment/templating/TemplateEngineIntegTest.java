@@ -202,21 +202,21 @@ public class TemplateEngineIntegTest extends BaseITCase {
                     ComponentRecipe recipe = getRecipeSerializer().readValue(r.toFile(), ComponentRecipe.class);
                     switch (recipe.getComponentName()) {
                         case "LoggerA": {
-                            assertEquals("timeout 5 && echo Logger A says hi\n",
+                            assertEquals("echo Logger A says hi\n",
                                     recipe.getManifests().get(0).getLifecycle().get("run"));
                             assertEquals("sleep 5 &&\necho Logger A says hi\n",
                                     recipe.getManifests().get(1).getLifecycle().get("run"));
                             break;
                         }
                         case "LoggerB": {
-                            assertEquals("timeout 3 && echo Ping pong its a default message && echo %DATE% %TIME%\n",
+                            assertEquals("echo Ping pong its a default message && echo %DATE% %TIME%\n",
                                     recipe.getManifests().get(0).getLifecycle().get("run"));
                             assertEquals("sleep 3 &&\necho Ping pong its a default message ; echo `date`\n",
                                     recipe.getManifests().get(1).getLifecycle().get("run"));
                             break;
                         }
                         case "LoggerC": {
-                            assertEquals("timeout 10 && echo Hello from Logger C && echo %DATE% %TIME%\n",
+                            assertEquals("echo Hello from Logger C && echo %DATE% %TIME%\n",
                                     recipe.getManifests().get(0).getLifecycle().get("run"));
                             assertEquals("sleep 10 &&\necho Hello from Logger C ; echo `date`\n",
                                     recipe.getManifests().get(1).getLifecycle().get("run"));

@@ -44,8 +44,7 @@ public class LoggerTransformer extends RecipeTransformer {
               + "echo " + componentParams.get("message").asText()
               + (componentParams.get("timestamp").asBoolean() ? " ; echo `date`\n" : "\n");
         String runScriptWindows =
-                "timeout " + componentParams.get("intervalInSecs").asInt() + " && "
-              + "echo " + componentParams.get("message").asText()
+                "echo " + componentParams.get("message").asText()
               + (componentParams.get("timestamp").asBoolean() ? " && echo %DATE% %TIME%\n" : "\n");
 
         Map<String, Object> lifecycle = new HashMap<>();
