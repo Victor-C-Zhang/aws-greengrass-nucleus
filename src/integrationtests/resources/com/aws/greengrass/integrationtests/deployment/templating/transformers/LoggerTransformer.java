@@ -16,7 +16,7 @@ import com.aws.greengrass.deployment.templating.exceptions.TemplateParameterExce
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 
-import java.util.Collections;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -40,18 +40,26 @@ public class LoggerTransformer extends RecipeTransformer {
     public ComponentRecipe transform(ComponentRecipe paramFile, JsonNode componentParams)
             throws RecipeTransformerException {
         String runScript =
-//                "for ((i=30; i>0; i--)); do\n" +
-                "  sleep " + componentParams.get("intervalInSecs").asInt() + " &&\n"
-              + "  echo " + componentParams.get("message").asText()
+                "sleep " + componentParams.get("intervalInSecs").asInt() + " &&\n"
+              + "echo " + componentParams.get("message").asText()
               + (componentParams.get("timestamp").asBoolean() ? " ; echo `date`\n" : "\n");
-//              + "  wait\n"
-//              + "done";
+        String runScriptWindows =
+                "timeout " + componentParams.get("intervalInSecs").asInt() + " && "
+              + "echo " + componentParams.get("message").asText()
+              + (componentParams.get("timestamp").asBoolean() ? " && echo %DATE% %TIME%\n" : "\n");
 
         Map<String, Object> lifecycle = new HashMap<>();
         lifecycle.put("run", runScript);
+        Map<String, Object> lifecycleWindows = new HashMap<>();
+        lifecycleWindows.put("run", runScriptWindows);
+
         PlatformSpecificManifest manifest = PlatformSpecificManifest.builder()
                 .platform(Platform.builder().os(Platform.OS.ALL).build())
                 .lifecycle(lifecycle)
+                .build();
+        PlatformSpecificManifest manifestWindows = PlatformSpecificManifest.builder()
+                .platform(Platform.builder().os(Platform.OS.WINDOWS).build())
+                .lifecycle(lifecycleWindows)
                 .build();
 
         return ComponentRecipe.builder()
@@ -60,7 +68,7 @@ public class LoggerTransformer extends RecipeTransformer {
                 .componentVersion(paramFile.getComponentVersion())
                 .componentDescription(paramFile.getComponentDescription())
                 .componentType(ComponentType.GENERIC)
-                .manifests(Collections.singletonList(manifest))
+                .manifests(Arrays.asList(manifestWindows, manifest))
                 .build();
     }
 }

@@ -129,7 +129,6 @@ public class TemplateEngineIntegTest extends BaseITCase {
         componentsToMerge.put("LoggerB", "1.0.0");
         componentsToMerge.put("LoggerC", "1.0.0");
         componentsToMerge.put("A", "1.0.0");
-        //        componentsToMerge.put("LoggerTemplate", "1.0.0");
 
         Map<String, ConfigurationUpdateOperation> updateConfig = new HashMap<>();
 
@@ -168,8 +167,6 @@ public class TemplateEngineIntegTest extends BaseITCase {
         componentsToMerge.put("LoggerA", "1.0.0");
         componentsToMerge.put("LoggerB", "1.0.0");
         componentsToMerge.put("LoggerC", "1.0.0");
-//        componentsToMerge.put("A", "1.0.0");
-        //        componentsToMerge.put("LoggerTemplate", "1.0.0");
 
         Map<String, ConfigurationUpdateOperation> updateConfig = new HashMap<>();
 
@@ -185,9 +182,6 @@ public class TemplateEngineIntegTest extends BaseITCase {
 
 
         Map<String, String> newComponentsToMerge = new HashMap<>();
-//        componentsToMerge.put("LoggerA", "1.0.0");
-//        componentsToMerge.put("LoggerB", "1.0.0");
-//        componentsToMerge.put("LoggerC", "1.0.0");
         componentsToMerge.put("A", "1.0.0");
 
         LocalOverrideRequest secondRequest = LocalOverrideRequest.builder().requestId("secondTemplatingDeployment")
@@ -208,21 +202,24 @@ public class TemplateEngineIntegTest extends BaseITCase {
                     ComponentRecipe recipe = getRecipeSerializer().readValue(r.toFile(), ComponentRecipe.class);
                     switch (recipe.getComponentName()) {
                         case "LoggerA": {
-                            assertEquals(
-                                    "  sleep 5 &&\n  echo Logger A says hi\n",
+                            assertEquals("timeout 5 && echo Logger A says hi\n",
                                     recipe.getManifests().get(0).getLifecycle().get("run"));
+                            assertEquals("sleep 5 &&\necho Logger A says hi\n",
+                                    recipe.getManifests().get(1).getLifecycle().get("run"));
                             break;
                         }
                         case "LoggerB": {
-                            assertEquals(
-                                    "  sleep 3 &&\n  echo Ping pong its a default message ; echo `date`\n",
+                            assertEquals("timeout 3 && echo Ping pong its a default message && echo %DATE% %TIME%\n",
                                     recipe.getManifests().get(0).getLifecycle().get("run"));
+                            assertEquals("sleep 3 &&\necho Ping pong its a default message ; echo `date`\n",
+                                    recipe.getManifests().get(1).getLifecycle().get("run"));
                             break;
                         }
                         case "LoggerC": {
-                            assertEquals(
-                                    "  sleep 10 &&\n  echo Hello from Logger C ; echo `date`\n",
+                            assertEquals("timeout 10 && echo Hello from Logger C && echo %DATE% %TIME%\n",
                                     recipe.getManifests().get(0).getLifecycle().get("run"));
+                            assertEquals("sleep 10 &&\necho Hello from Logger C ; echo `date`\n",
+                                    recipe.getManifests().get(1).getLifecycle().get("run"));
                             break;
                         }
                         case "A": {
