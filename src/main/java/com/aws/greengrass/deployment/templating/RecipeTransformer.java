@@ -44,7 +44,6 @@ public abstract class RecipeTransformer {
 
     protected static final ObjectMapper RECIPE_SERIALIZER = getRecipeSerializer();
 
-    @Getter // for unit testing
     private JsonNode templateSchema;
     @Getter // for unit testing
     private JsonNode effectiveDefaultConfig;
