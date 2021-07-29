@@ -23,6 +23,14 @@ public class EchoTransformer extends RecipeTransformer {
     private static final String COMPONENT_DESCRIPTION = "Component expanded with EchoTransformer";
     private static final String COMPONENT_PUBLISHER = "Me";
 
+    /*
+      param1:
+        type: string
+        required: true
+      param2:
+        type: string
+        required: true
+     */
     @SuppressWarnings("PMD.AvoidDuplicateLiterals")
     private static final String TEMPLATE_SCHEMA = "{\n" + "  \"param1\": {\n" + "    \"type\": \"string\",\n"
             + "    \"required\": true\n" + "  },\n" + "  \"param2\": {\n" + "    \"type\": \"string\",\n"
@@ -41,8 +49,8 @@ public class EchoTransformer extends RecipeTransformer {
     @Override
     public ComponentRecipe transform(ComponentRecipe paramFile, JsonNode componentConfig) {
         Map<String, Object> newLifecyle = new HashMap<>();
-        String runString = "echo Param1: " + componentConfig.get("param1").asText() + " Param2: " + componentConfig.get(
-                "param2").asText();
+        String runString = String.format("echo Param1: %s Param2: %s",
+                componentConfig.get("param1").asText(), componentConfig.get("param2").asText());
         newLifecyle.put("run", runString);
 
         PlatformSpecificManifest manifest =

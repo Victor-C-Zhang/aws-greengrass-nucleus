@@ -23,8 +23,20 @@ import java.util.Map;
 import static com.amazon.aws.iot.greengrass.component.common.SerializerFactory.getRecipeSerializer;
 
 public class LoggerTransformer extends RecipeTransformer {
-    private static final String PARAMETER_SCHEMA = "intervalInSecs:\n" + "  type: number\n" + "  required: true\n" +
-            "timestamp:\n" + "  type: boolean\n" + "  required: false\n" + "message:\n" + "  type: string\n"
+
+    /*
+      intervalInSecs:
+        type: number
+        required: true
+      timestamp:
+        type: boolean
+        required: false
+      message:
+        type: string
+        required: false
+     */
+    private static final String PARAMETER_SCHEMA = "intervalInSecs:\n" + "  type: number\n" + "  required: true\n"
+            + "timestamp:\n" + "  type: boolean\n" + "  required: false\n" + "message:\n" + "  type: string\n"
             + "  required: false";
 
     @Override
@@ -39,13 +51,14 @@ public class LoggerTransformer extends RecipeTransformer {
     @Override
     public ComponentRecipe transform(ComponentRecipe paramFile, JsonNode componentParams)
             throws RecipeTransformerException {
-        String runScript =
-                "sleep " + componentParams.get("intervalInSecs").asInt() + " &&\n"
-              + "echo " + componentParams.get("message").asText()
-              + (componentParams.get("timestamp").asBoolean() ? " ; echo `date`\n" : "\n");
-        String runScriptWindows =
-                "echo " + componentParams.get("message").asText()
-              + (componentParams.get("timestamp").asBoolean() ? " && echo %DATE% %TIME%\n" : "\n");
+        String getTimestampString = componentParams.get("timestamp").asBoolean() ? " ; echo `date`" : "";
+        String getTimestampStringWindows = componentParams.get("timestamp").asBoolean() ? " && echo %DATE% %TIME%" : "";
+
+        String runScript = String.format("sleep %d && echo %s", componentParams.get("intervalInSecs").asInt(),
+                componentParams.get("message").asText())
+                + getTimestampString;
+        String runScriptWindows = String.format("echo %s", componentParams.get("message").asText())
+                + getTimestampStringWindows;
 
         Map<String, Object> lifecycle = new HashMap<>();
         lifecycle.put("run", runScript);

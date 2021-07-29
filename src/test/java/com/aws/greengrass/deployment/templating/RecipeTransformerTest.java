@@ -76,6 +76,19 @@ public class RecipeTransformerTest {
             + "objectParam:\n" + "  key1: val1\n" + "  key2:\n" + "    subkey1: subval2\n" + "    subkey2: subval2\n"
             + "arrayParam:\n" + "  - 1\n" + "  - 2\n" + "  - red\n" + "  - blue";
 
+    /*
+      numberParam: 42069
+      objectParam:
+        key1: val1
+        key2:
+          subkey1: subval2
+          subkey2: subval2
+      arrayParam:
+        - 1
+        - 2
+        - red
+        - blue
+     */
     static String VALID_EFFECTIVE_DEFAULT_PARAMS = "numberParam: 42069\n" + "objectParam:\n" + "  key1: val1\n"
             + "  key2:\n" + "    subkey1: subval2\n" + "    subkey2: subval2\n" + "arrayParam:\n" + "  - 1\n"
             + "  - 2\n" + "  - red\n" + "  - blue";

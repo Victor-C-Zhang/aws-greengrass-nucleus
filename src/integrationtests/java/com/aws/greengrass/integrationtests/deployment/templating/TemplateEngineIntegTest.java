@@ -109,7 +109,7 @@ public class TemplateEngineIntegTest extends BaseITCase {
     }
 
     @Test
-    void WHEN_a_deployment_has_templates_THEN_they_are_expanded_properly() throws Exception {
+    void WHEN_a_local_deployment_has_templates_THEN_they_are_expanded_properly() throws Exception {
         CountDownLatch firstDeploymentCDL = new CountDownLatch(1);
         DeploymentStatusKeeper deploymentStatusKeeper = kernel.getContext().get(DeploymentStatusKeeper.class);
         deploymentStatusKeeper.registerDeploymentStatusConsumer(Deployment.DeploymentType.LOCAL, (status) -> {
@@ -144,7 +144,7 @@ public class TemplateEngineIntegTest extends BaseITCase {
     }
 
     @Test
-    void multipleDeployment() throws Exception {
+    void WHEN_multiple_local_deployments_are_requested_THEN_templating_works_for_all_deployments() throws Exception {
         CountDownLatch firstDeploymentCDL = new CountDownLatch(1);
         CountDownLatch secondDeploymentCDL = new CountDownLatch(1);
         DeploymentStatusKeeper deploymentStatusKeeper = kernel.getContext().get(DeploymentStatusKeeper.class);
@@ -202,23 +202,23 @@ public class TemplateEngineIntegTest extends BaseITCase {
                     ComponentRecipe recipe = getRecipeSerializer().readValue(r.toFile(), ComponentRecipe.class);
                     switch (recipe.getComponentName()) {
                         case "LoggerA": {
-                            assertEquals("echo Logger A says hi\n",
+                            assertEquals("echo Logger A says hi",
                                     recipe.getManifests().get(0).getLifecycle().get("run"));
-                            assertEquals("sleep 5 &&\necho Logger A says hi\n",
+                            assertEquals("sleep 5 && echo Logger A says hi",
                                     recipe.getManifests().get(1).getLifecycle().get("run"));
                             break;
                         }
                         case "LoggerB": {
-                            assertEquals("echo Ping pong its a default message && echo %DATE% %TIME%\n",
+                            assertEquals("echo Ping pong its a default message && echo %DATE% %TIME%",
                                     recipe.getManifests().get(0).getLifecycle().get("run"));
-                            assertEquals("sleep 3 &&\necho Ping pong its a default message ; echo `date`\n",
+                            assertEquals("sleep 3 && echo Ping pong its a default message ; echo `date`",
                                     recipe.getManifests().get(1).getLifecycle().get("run"));
                             break;
                         }
                         case "LoggerC": {
-                            assertEquals("echo Hello from Logger C && echo %DATE% %TIME%\n",
+                            assertEquals("echo Hello from Logger C && echo %DATE% %TIME%",
                                     recipe.getManifests().get(0).getLifecycle().get("run"));
-                            assertEquals("sleep 10 &&\necho Hello from Logger C ; echo `date`\n",
+                            assertEquals("sleep 10 && echo Hello from Logger C ; echo `date`",
                                     recipe.getManifests().get(1).getLifecycle().get("run"));
                             break;
                         }

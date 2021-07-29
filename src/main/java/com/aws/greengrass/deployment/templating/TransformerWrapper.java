@@ -38,23 +38,7 @@ public class TransformerWrapper {
             throw new RecipeTransformerException("Could not find template parsing jar to execute. Looked for a jar at "
                     + pathToExecutable);
         }
-        //EZPlugins ezPlugins = context.get(EZPlugins.class);
         AtomicReference<Class<RecipeTransformer>> transformerClass = new AtomicReference<>();
-        //try {
-        //    ezPlugins.loadPlugin(pathToExecutable, sc -> sc.matchSubclassesOf(RecipeTransformer.class, c -> {
-        //        if ("com.aws.greengrass.deployment.templating.RecipeTransformerTest$FakeRecipeTransformer"
-        //                .equals(c.getName())) { // otherwise ezplugins will try to load the inner class too
-        //            return;
-        //        }
-        //        if (transformerClass.get() != null) {
-        //            throw new RuntimeException("Found more than one candidate transformer class.");
-        //        }
-        //        transformerClass.set((Class<RecipeTransformer>) c);
-        //    }));
-        //} catch (IOException | RuntimeException e) {
-        //    throw new RecipeTransformerException(e);
-        //}
-
         Consumer<FastClasspathScanner> matcher = sc -> sc.matchSubclassesOf(RecipeTransformer.class, c -> {
             if ("com.aws.greengrass.deployment.templating.RecipeTransformerTest$FakeRecipeTransformer"
                     .equals(c.getName())) { // otherwise ezplugins will try to load the inner class too
