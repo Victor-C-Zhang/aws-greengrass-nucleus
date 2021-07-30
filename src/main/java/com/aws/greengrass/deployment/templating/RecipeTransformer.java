@@ -119,11 +119,11 @@ public abstract class RecipeTransformer {
         for (Iterator<String> it = templateSchema.fieldNames(); it.hasNext(); ) {
             String field = it.next();
             if (!defaultNode.has(field)
-                    && !(getTitleInsensitive(templateSchema.get(field), TEMPLATE_FIELD_REQUIRED_KEY)).asBoolean()) {
+                    && !templateSchema.get(field).get(TEMPLATE_FIELD_REQUIRED_KEY).asBoolean()) {
                 throw new MissingTemplateParameterException("Template does not provide default for optional "
                         + "parameter: " + field);
             }
-            if (getTitleInsensitive(templateSchema.get(field), TEMPLATE_FIELD_REQUIRED_KEY).asBoolean()) {
+            if (templateSchema.get(field).get(TEMPLATE_FIELD_REQUIRED_KEY).asBoolean()) {
                 ((ObjectNode)defaultNode).remove(field);
                 continue;
             }
@@ -206,58 +206,13 @@ public abstract class RecipeTransformer {
         Iterator<String> fieldNames = defaultVal.fieldNames();
         while (fieldNames.hasNext()) {
             String fieldName = fieldNames.next();
-            if (hasTitleInsensitive(customVal, fieldName)) { // TODO: how do we resolve field capitalization???
-                removeTitleInsensitive((ObjectNode)retval, fieldName);
-                ((ObjectNode)retval).set(fieldName, getTitleInsensitive(customVal, fieldName)); // non-recursive
+            if (customVal.has(fieldName)) { // TODO: how do we resolve field capitalization???
+                ((ObjectNode)retval).set(fieldName, customVal.get(fieldName)); // non-recursive
             } else {
                 ((ObjectNode)retval).set(fieldName, defaultVal.get(fieldName));
             }
         }
         return retval;
-    }
-
-    // equivalent to asking for both "fieldName" and "FieldName".
-    // If one is declared but the other isn't, return the one declared.
-    // If neither are declared, return null.
-    // If both are declared, return the one asked for.
-    // does no error checking either. good luck!
-    protected static JsonNode getTitleInsensitive(JsonNode node, String fieldName) {
-        if (node.has(fieldName)) {
-            return node.get(fieldName);
-        }
-        return node.get(invertCase(fieldName));
-    }
-
-    // similar, but remove instead of get. note it has the same contract as remove; that is, if field doesn't exist,
-    // return null.
-    protected static JsonNode removeTitleInsensitive(ObjectNode node, String fieldName) {
-        if (node.has(fieldName)) {
-            return node.remove(fieldName);
-        }
-        String invertCaseFieldname = invertCase(fieldName);
-        if (node.has(invertCaseFieldname)) {
-            return node.remove(invertCaseFieldname);
-        }
-        return null;
-    }
-
-    // similar, but for has instead of remove.
-    protected static boolean hasTitleInsensitive(JsonNode node, String fieldName) {
-        if (node.has(fieldName)) {
-            return true;
-        }
-        return node.has(invertCase(fieldName));
-    }
-
-    // invert the case of the first character in a string
-    protected static String invertCase(String camelCaseString) {
-        char inverseCaseFirstChar;
-        if (Character.isUpperCase(camelCaseString.charAt(0))) {
-            inverseCaseFirstChar = Character.toLowerCase(camelCaseString.charAt(0));
-        } else {
-            inverseCaseFirstChar = Character.toUpperCase(camelCaseString.charAt(0));
-        }
-        return inverseCaseFirstChar + camelCaseString.substring(1);
     }
 
     // Utility to get the node type from a string. Useful when parsing type from JSON.

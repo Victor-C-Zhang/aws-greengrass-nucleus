@@ -169,6 +169,11 @@ public class RecipeTransformerTest {
                         "extraNumberParam: 42069";
         ComponentRecipe extraParam = getParameterFileWithParams(extraNumber);
         assertThrows(RecipeTransformerException.class, () -> recipeTransformer.execute(extraParam));
+
+        // parameter with different capitalization
+        String wrongCap = "stringParam: a string\n" + "booleanParam: haha im a string\n" + "NumberParam: 42068\n";
+        ComponentRecipe wrongCapParam = getParameterFileWithParams(wrongCap);
+        assertThrows(RecipeTransformerException.class, () -> recipeTransformer.execute(wrongCapParam));
     }
 
     @Test
@@ -191,12 +196,10 @@ public class RecipeTransformerTest {
     void WHEN_mergeParam_is_called_THEN_it_works()
             throws IOException, TemplateParameterException, RecipeTransformerException {
         // nullity of config
-        ComponentRecipe nullConfig = ComponentRecipe.builder()
-                .recipeFormatVersion(RecipeFormatVersion.JAN_25_2020)
-                .componentName("A")
-                .componentVersion(new Semver("1.0.0"))
-//                .componentConfiguration(null)
-                .build();
+        ComponentRecipe nullConfig =
+                ComponentRecipe.builder().recipeFormatVersion(RecipeFormatVersion.JAN_25_2020).componentName("A").componentVersion(new Semver("1.0.0"))
+                        //                .componentConfiguration(null)
+                        .build();
         RecipeTransformer recipeTransformer = new FakeRecipeTransformer();
         recipeTransformer.initTemplateRecipe(getTemplate(defaultTemplateSchema, defaultTemplateDefaultParams));
         // TODO: break out schema violations into a separate exception from RecipeTransformerException
@@ -206,31 +209,19 @@ public class RecipeTransformerTest {
         String missingOptional = "stringParam: a string\n" + "booleanParam: true";
         ComponentRecipe missingOptionalRecipe = getParameterFileWithParams(missingOptional);
         JsonNode actual = extractDefaultConfig(recipeTransformer.execute(missingOptionalRecipe));
-        String expectedString = "stringParam: a string\n" + "booleanParam: true\n" + "numberParam: 42069\n"
-                + "objectParam:\n" + "  key1: val1\n" + "  key2:\n" + "    subkey1: subval2\n"
-                + "    subkey2: subval2\n" + "arrayParam:\n" + "  - 1\n" + "  - 2\n" + "  - red\n" + "  - blue";
+        String expectedString =
+                "stringParam: a string\n" + "booleanParam: true\n" + "numberParam: 42069\n" + "objectParam:\n" + "  key1: val1\n" + "  key2:\n" + "    subkey1: subval2\n"
+                        + "    subkey2: subval2\n" + "arrayParam:\n" + "  - 1\n" + "  - 2\n" + "  - red\n" + "  - blue";
         JsonNode expected = getRecipeSerializer().readTree(expectedString);
         assertEquals(expected, actual);
 
         // default and custom both have a value
-        String differentValue = "stringParam: a string\n" + "booleanParam: true\n" + "numberParam: 42068\n"
-                + "objectParam:\n" + "  key1: val1\n" + "  key2:\n" + "    subkey1: newSubval2\n"
-                + "    subkey2: subval2\n" + "arrayParam:\n" + "  - 1\n" + "  - 2\n" + "  - red\n" + "  - blue";
+        String differentValue =
+                "stringParam: a string\n" + "booleanParam: true\n" + "numberParam: 42068\n" + "objectParam:\n" + "  key1: val1\n" + "  key2:\n" + "    subkey1: newSubval2\n"
+                        + "    subkey2: subval2\n" + "arrayParam:\n" + "  - 1\n" + "  - 2\n" + "  - red\n" + "  - blue";
         ComponentRecipe differentValueRecipe = getParameterFileWithParams(differentValue);
         actual = extractDefaultConfig(recipeTransformer.execute(differentValueRecipe));
         expected = getRecipeSerializer().readTree(differentValue);
-        assertEquals(expected, actual);
-
-        // default and custom have different capitalizations for the same field
-        String differentCap = "stringParam: a string\n" + "booleanParam: true\n" + "NumberParam: 42068\n"
-                + "objectParam:\n" + "  key1: val1\n" + "  key2:\n" + "    Subkey1: newSubval2\n"
-                + "    Subkey2: subval2\n" + "arrayParam:\n" + "  - 1\n" + "  - 2\n" + "  - red\n" + "  - blue";
-        ComponentRecipe differentCapRecipe = getParameterFileWithParams(differentCap);
-        actual = extractDefaultConfig(recipeTransformer.execute(differentCapRecipe));
-        expectedString = "stringParam: a string\n" + "booleanParam: true\n" + "numberParam: 42068\n" // numberParam diff
-                + "objectParam:\n" + "  key1: val1\n" + "  key2:\n" + "    Subkey1: newSubval2\n"
-                + "    Subkey2: subval2\n" + "arrayParam:\n" + "  - 1\n" + "  - 2\n" + "  - red\n" + "  - blue";
-        expected = getRecipeSerializer().readTree(expectedString);
         assertEquals(expected, actual);
     }
 
