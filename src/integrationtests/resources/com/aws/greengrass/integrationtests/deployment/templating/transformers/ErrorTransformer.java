@@ -11,8 +11,8 @@ import com.fasterxml.jackson.databind.JsonNode;
 
 public class ErrorTransformer extends RecipeTransformer {
     @Override
-    protected JsonNode initTemplateSchema() throws TemplateParameterException {
-        throw new TemplateParameterException("An error was thrown");
+    protected String initTemplateSchema() {
+        return null; // should actually be non-null in production
     }
 
     @Override

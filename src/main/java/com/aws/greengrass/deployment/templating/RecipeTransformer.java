@@ -12,8 +12,8 @@ import com.aws.greengrass.deployment.templating.exceptions.MissingTemplateParame
 import com.aws.greengrass.deployment.templating.exceptions.RecipeTransformerException;
 import com.aws.greengrass.deployment.templating.exceptions.TemplateParameterException;
 import com.aws.greengrass.deployment.templating.exceptions.TemplateParameterTypeMismatchException;
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.JsonNodeType;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import lombok.Getter;
@@ -42,8 +42,6 @@ public abstract class RecipeTransformer {
     static final String TEMPLATE_FIELD_REQUIRED_KEY = "required";
     static final String TEMPLATE_FIELD_TYPE_KEY = "type";
 
-    protected static final ObjectMapper RECIPE_SERIALIZER = getRecipeSerializer();
-
     private JsonNode templateSchema;
     @Getter // for unit testing
     private JsonNode effectiveDefaultConfig;
@@ -53,19 +51,23 @@ public abstract class RecipeTransformer {
      * @param templateRecipe to extract default params, param schema.
      * @throws TemplateParameterException if the template recipe or custom config is malformed.
      */
+    @SuppressWarnings("PMD.AvoidCatchingGenericException")
     void initTemplateRecipe(ComponentRecipe templateRecipe) throws TemplateParameterException {
-        JsonNode temp = initTemplateSchema();
-        templateSchema = (temp == null) ? getRecipeSerializer().createObjectNode() : temp;
+        try {
+            templateSchema = getRecipeSerializer().readTree(initTemplateSchema());
+        } catch (JsonProcessingException e) {
+            throw new TemplateParameterException(e);
+        }
         effectiveDefaultConfig = getAndValidateTemplateComponentConfig(
                 templateRecipe.getComponentConfiguration().getDefaultConfiguration());
     }
 
     /**
      * Workaround to declaring an "abstract" template schema field.
-     * @return a JsonNode representing the desired template schema. Can be a node with no fields, representing a pure
-     *     substitution template.
+     * @return a stringified JsonNode (in YAML format) representing the desired template schema. Can be a node with no
+     *     fields, representing a pure substitution template.
      */
-    protected abstract JsonNode initTemplateSchema() throws TemplateParameterException;
+    protected abstract String initTemplateSchema();
 
     /**
      * Stateless expansion for one component.

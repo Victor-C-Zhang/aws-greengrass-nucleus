@@ -38,12 +38,8 @@ public class LoggerTransformer extends RecipeTransformer {
             + "  required: false";
 
     @Override
-    protected JsonNode initTemplateSchema() throws TemplateParameterException {
-        try {
-            return getRecipeSerializer().readTree(PARAMETER_SCHEMA);
-        } catch (JsonProcessingException e) {
-            throw new TemplateParameterException(e);
-        }
+    protected String initTemplateSchema() {
+        return PARAMETER_SCHEMA;
     }
 
     @Override

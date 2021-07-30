@@ -270,12 +270,8 @@ public class RecipeTransformerTest {
 
     private static class FakeRecipeTransformer extends RecipeTransformer {
         @Override
-        protected JsonNode initTemplateSchema() throws TemplateParameterException {
-            try {
-                return getRecipeSerializer().readTree(TEMPLATE_SCHEMA);
-            } catch (JsonProcessingException e) {
-                throw new TemplateParameterException(e);
-            }
+        protected String initTemplateSchema() {
+            return TEMPLATE_SCHEMA;
         }
 
         @Override

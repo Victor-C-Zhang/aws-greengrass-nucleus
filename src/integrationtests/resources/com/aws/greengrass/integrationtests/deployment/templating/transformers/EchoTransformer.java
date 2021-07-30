@@ -35,12 +35,8 @@ public class EchoTransformer extends RecipeTransformer {
             + "    \"required\": true\n" + "  },\n" + "}";
 
     @Override
-    protected JsonNode initTemplateSchema() throws TemplateParameterException {
-        try {
-            return RECIPE_SERIALIZER.readTree(TEMPLATE_SCHEMA);
-        } catch (JsonProcessingException e) {
-            throw new TemplateParameterException(e);
-        }
+    protected String initTemplateSchema() {
+        return TEMPLATE_SCHEMA;
     }
 
     // generate a component recipe from a list of well-behaved parameters
