@@ -195,13 +195,13 @@ public class TemplateEngine {
             ComponentRecipe templateRecipe = mapOfComponentIdentifierToRecipe.get(templateEntry.getValue());
             for (PlatformSpecificManifest manifest : templateRecipe.getManifests()) {
                 if (manifest.getLifecycle() != null && manifest.getLifecycle().size() != 0) {
-                    throw new RecipeTransformerException("Templates cannot have non-empty lifecycle. "
+                    throw new RecipeTransformerException("Templates must have empty lifecycle. "
                             + templateEntry.getValue().getName() + " has a lifecycle map with "
                             + manifest.getLifecycle().size() + " key/value pairs.");
                 }
             }
             if (templateRecipe.getLifecycle() != null && templateRecipe.getLifecycle().size() != 0) {
-                throw new RecipeTransformerException("Templates cannot have non-empty lifecycle. "
+                throw new RecipeTransformerException("Templates must have empty lifecycle. "
                         + templateEntry.getValue().getName() + " has a lifecycle map with "
                         + templateRecipe.getLifecycle().size() + " key/value pairs.");
             }

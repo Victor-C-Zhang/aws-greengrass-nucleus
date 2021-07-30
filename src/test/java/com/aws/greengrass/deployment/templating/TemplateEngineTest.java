@@ -186,13 +186,13 @@ class TemplateEngineTest extends BaseITCase {
         Path manifestRecipeDir = rootDir.resolve("recipes_manifests");
         RecipeTransformerException ex = assertThrows(RecipeTransformerException.class,
                 () -> templateEngine.process(manifestRecipeDir, artifactsDir));
-        assertThat(ex.getMessage(), containsString("Templates cannot have non-empty lifecycle"));
+        assertThat(ex.getMessage(), containsString("Templates must have empty lifecycle"));
 
         // lifecycle
         Path lifecycleRecipeDir = rootDir.resolve("recipes_lifecycle");
         RecipeTransformerException ex2 = assertThrows(RecipeTransformerException.class,
                 () -> templateEngine.process(lifecycleRecipeDir, artifactsDir));
-        assertThat(ex2.getMessage(), containsString("Templates cannot have non-empty lifecycle"));
+        assertThat(ex2.getMessage(), containsString("Templates must have empty lifecycle"));
     }
 
     @Test
