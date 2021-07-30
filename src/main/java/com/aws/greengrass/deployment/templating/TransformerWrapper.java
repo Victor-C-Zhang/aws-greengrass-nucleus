@@ -40,10 +40,6 @@ public class TransformerWrapper {
         }
         AtomicReference<Class<RecipeTransformer>> transformerClass = new AtomicReference<>();
         Consumer<FastClasspathScanner> matcher = sc -> sc.matchSubclassesOf(RecipeTransformer.class, c -> {
-            if ("com.aws.greengrass.deployment.templating.RecipeTransformerTest$FakeRecipeTransformer"
-                    .equals(c.getName())) { // otherwise ezplugins will try to load the inner class too
-                return;
-            }
             if (transformerClass.get() != null) {
                 throw new RuntimeException("Found more than one candidate transformer class.");
             }
@@ -55,7 +51,7 @@ public class TransformerWrapper {
                 URLClassLoader cl = new URLClassLoader(urls);
                 FastClasspathScanner sc = new FastClasspathScanner();
                 sc.ignoreParentClassLoaders();
-                sc.addClassLoader(cl);
+                sc.overrideClassLoaders(cl);
                 matcher.accept(sc);
                 sc.scan(context.get(ExecutorService.class), 1);
                 try {
