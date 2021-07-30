@@ -94,7 +94,8 @@ public class TemplateEngineIntegTest extends BaseITCase {
         FleetStatusService fleetStatusService = (FleetStatusService) kernel.locate(FLEET_STATUS_SERVICE_TOPICS);
         fleetStatusService.getIsConnected().set(false);
         // pre-load contents to package store
-        localStoreContentPath = Paths.get(TemplateEngineIntegTest.class.getResource(".").toURI());
+        localStoreContentPath =
+                Paths.get(TemplateEngineIntegTest.class.getResource(".").toURI());
         PreloadComponentStoreHelper.preloadRecipesFromTestResourceDir(localStoreContentPath.resolve("recipes"),
                 kernel.getNucleusPaths().recipePath());
         copyFolderRecursively(localStoreContentPath.resolve("artifacts"), kernel.getNucleusPaths().artifactPath(),

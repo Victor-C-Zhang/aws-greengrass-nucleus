@@ -52,7 +52,8 @@ public class TransformWrapperIntegTest extends BaseITCase {
     @Test
     void GIVEN_jar_with_no_transformer_WHEN_try_instantiation_THEN_throw_transformer_exception()
             throws URISyntaxException {
-        Path noImplementedTransformer = Paths.get(getClass().getResource("no-implemented-transformer.jar").toURI());
+        Path noImplementedTransformer =
+                Paths.get(getClass().getResource("no-implemented-transformer.jar").toURI());
         RecipeTransformerException ex = assertThrows(RecipeTransformerException.class,
                 () -> new TransformerWrapper(noImplementedTransformer, templateRecipe, context));
         assertThat(ex.getMessage(), containsString("Could not find a candidate transformer class for template"));
