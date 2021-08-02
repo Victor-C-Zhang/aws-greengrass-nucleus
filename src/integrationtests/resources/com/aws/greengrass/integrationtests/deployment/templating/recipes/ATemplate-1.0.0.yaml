@@ -1,0 +1,14 @@
+---
+recipeFormatVersion: '2020-01-25'
+componentName: ATemplate
+componentPublisher: Me
+componentVersion: '1.0.0'
+ComponentConfiguration:
+  DefaultConfiguration:
+    parameterSchema:
+      param1:
+        type: string
+        required: true
+      param2:
+        type: string
+        required: true

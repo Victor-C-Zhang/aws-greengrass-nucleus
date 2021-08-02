@@ -1,0 +1,8 @@
+---
+recipeFormatVersion: '2020-01-25'
+componentName: FirstTemplate
+componentVersion: '1.0.0'
+componentDescription: Template for testing
+Manifests:
+  - Platform:
+      os: all

@@ -1,0 +1,5 @@
+---
+RecipeFormatVersion: '2020-01-25'
+ComponentName: SomeOtherTemplate
+ComponentVersion: '2.1.0'
+ComponentDescription: Normal template

@@ -1,0 +1,10 @@
+---
+RecipeFormatVersion: '2020-01-25'
+ComponentName: ManifestTemplate
+ComponentVersion: '1.0.0'
+ComponentDescription: Template with lifecycle in manifests
+Manifests:
+  - platform:
+      os: all
+    lifecycle:
+      install: echo Illegal lifecycle

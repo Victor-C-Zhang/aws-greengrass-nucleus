@@ -5,19 +5,20 @@
 
 package com.aws.greengrass.deployment.templating;
 
+import com.amazon.aws.iot.greengrass.component.common.ComponentConfiguration;
 import com.amazon.aws.iot.greengrass.component.common.ComponentRecipe;
 import com.aws.greengrass.deployment.templating.exceptions.IllegalTemplateParameterException;
 import com.aws.greengrass.deployment.templating.exceptions.MissingTemplateParameterException;
 import com.aws.greengrass.deployment.templating.exceptions.RecipeTransformerException;
 import com.aws.greengrass.deployment.templating.exceptions.TemplateParameterException;
 import com.aws.greengrass.deployment.templating.exceptions.TemplateParameterTypeMismatchException;
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.JsonNodeType;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import lombok.Getter;
 
 import java.util.Iterator;
-import java.util.Optional;
 import javax.annotation.Nullable;
 
 import static com.amazon.aws.iot.greengrass.component.common.SerializerFactory.getRecipeSerializer;
@@ -41,9 +42,8 @@ public abstract class RecipeTransformer {
     static final String TEMPLATE_FIELD_REQUIRED_KEY = "required";
     static final String TEMPLATE_FIELD_TYPE_KEY = "type";
 
-    protected static final ObjectMapper RECIPE_SERIALIZER = getRecipeSerializer();
-
     private JsonNode templateSchema;
+    @Getter // for unit testing
     private JsonNode effectiveDefaultConfig;
 
     /**
@@ -51,18 +51,23 @@ public abstract class RecipeTransformer {
      * @param templateRecipe to extract default params, param schema.
      * @throws TemplateParameterException if the template recipe or custom config is malformed.
      */
+    @SuppressWarnings("PMD.AvoidCatchingGenericException")
     void initTemplateRecipe(ComponentRecipe templateRecipe) throws TemplateParameterException {
-        templateSchema = initTemplateSchema();
+        try {
+            templateSchema = getRecipeSerializer().readTree(initTemplateSchema());
+        } catch (JsonProcessingException e) {
+            throw new TemplateParameterException(e);
+        }
         effectiveDefaultConfig = getAndValidateTemplateComponentConfig(
                 templateRecipe.getComponentConfiguration().getDefaultConfiguration());
     }
 
     /**
      * Workaround to declaring an "abstract" template schema field.
-     * @return a JsonNode representing the desired template schema. Can be a node with no fields, representing a pure
-     *     substitution template.
+     * @return a stringified JsonNode (in YAML format) representing the desired template schema. Can be a node with no
+     *     fields, representing a pure substitution template.
      */
-    protected abstract JsonNode initTemplateSchema() throws TemplateParameterException;
+    protected abstract String initTemplateSchema();
 
     /**
      * Stateless expansion for one component.
@@ -106,15 +111,19 @@ public abstract class RecipeTransformer {
 
         // validate hard-coded/user-provided "default configs"
         JsonNode defaultNode = defaultConfig.get(TEMPLATE_DEFAULT_PARAMETER_KEY);
+        if (defaultNode == null) {
+            defaultNode = getRecipeSerializer().createObjectNode();
+        }
+
         // check both ways
         for (Iterator<String> it = templateSchema.fieldNames(); it.hasNext(); ) {
             String field = it.next();
             if (!defaultNode.has(field)
-                    && !(getTitleInsensitive(templateSchema.get(field), TEMPLATE_FIELD_REQUIRED_KEY)).asBoolean()) {
+                    && !templateSchema.get(field).get(TEMPLATE_FIELD_REQUIRED_KEY).asBoolean()) {
                 throw new MissingTemplateParameterException("Template does not provide default for optional "
                         + "parameter: " + field);
             }
-            if (getTitleInsensitive(templateSchema.get(field), TEMPLATE_FIELD_REQUIRED_KEY).asBoolean()) {
+            if (templateSchema.get(field).get(TEMPLATE_FIELD_REQUIRED_KEY).asBoolean()) {
                 ((ObjectNode)defaultNode).remove(field);
                 continue;
             }
@@ -141,8 +150,12 @@ public abstract class RecipeTransformer {
     // returns the resulting parameter set.
     protected JsonNode mergeAndValidateComponentParams(ComponentRecipe paramFile)
             throws RecipeTransformerException {
-        JsonNode paramNode = paramFile.getComponentConfiguration().getDefaultConfiguration();
-        JsonNode mergedParams = mergeParams(effectiveDefaultConfig, paramNode).get();
+        ComponentConfiguration componentConfiguration = paramFile.getComponentConfiguration();
+        JsonNode paramNode = getRecipeSerializer().createObjectNode();
+        if (componentConfiguration != null && componentConfiguration.getDefaultConfiguration() != null) {
+            paramNode = componentConfiguration.getDefaultConfiguration();
+        }
+        JsonNode mergedParams = mergeParams(effectiveDefaultConfig, paramNode);
         try {
             validateParams(mergedParams);
         } catch (TemplateParameterException e) {
@@ -167,8 +180,9 @@ public abstract class RecipeTransformer {
             }
             JsonNodeType paramType = params.get(field).getNodeType();
             if (nodeType(templateSchema.get(field).get(TEMPLATE_FIELD_TYPE_KEY).asText()) != paramType) {
-                throw new TemplateParameterTypeMismatchException("Provided parameter does not satisfy template schema. "
-                        + "Expected " + nodeType(templateSchema.get(field).get(TEMPLATE_FIELD_TYPE_KEY).asText())
+                throw new TemplateParameterTypeMismatchException("Provided parameter " + field
+                        + " does not satisfy template schema. Expected "
+                        + nodeType(templateSchema.get(field).get(TEMPLATE_FIELD_TYPE_KEY).asText())
                         + " but got " + paramType);
             }
         }
@@ -183,56 +197,22 @@ public abstract class RecipeTransformer {
 
     // merge the defaultVal parameter map into the customVal parameter map by set addition. if both declare a value
     // for the same parameter, the one in customVal takes precedence.
-    protected static Optional<JsonNode> mergeParams(@Nullable JsonNode defaultVal, @Nullable JsonNode customVal) {
-        if (defaultVal == null) {
-            return Optional.ofNullable(customVal);
-        }
+    static JsonNode mergeParams(JsonNode defaultVal, @Nullable JsonNode customVal) {
         if (customVal == null) {
-            return Optional.of(defaultVal);
+            return defaultVal;
         }
 
         JsonNode retval = customVal.deepCopy();
         Iterator<String> fieldNames = defaultVal.fieldNames();
         while (fieldNames.hasNext()) {
             String fieldName = fieldNames.next();
-            if (hasTitleInsensitive(customVal, fieldName)) { // TODO: how do we resolve field capitalization???
+            if (customVal.has(fieldName)) { // TODO: how do we resolve field capitalization???
                 ((ObjectNode)retval).set(fieldName, customVal.get(fieldName)); // non-recursive
             } else {
                 ((ObjectNode)retval).set(fieldName, defaultVal.get(fieldName));
             }
         }
-        return Optional.of(retval);
-    }
-
-    // equivalent to asking for both "fieldName" and "FieldName".
-    // If one is declared but the other isn't, return the one declared.
-    // If neither are declared, return null.
-    // If both are declared, return the one asked for.
-    // does no error checking either. good luck!
-    protected static JsonNode getTitleInsensitive(JsonNode node, String fieldName) {
-        if (node.has(fieldName)) {
-            return node.get(fieldName);
-        }
-        return node.get(invertCase(fieldName));
-    }
-
-    // similar, but for has instead of get
-    protected static boolean hasTitleInsensitive(JsonNode node, String fieldName) {
-        if (node.has(fieldName)) {
-            return true;
-        }
-        return node.has(invertCase(fieldName));
-    }
-
-    // invert the case of the first character in a string
-    protected static String invertCase(String camelCaseString) {
-        char inverseCaseFirstChar;
-        if (Character.isUpperCase(camelCaseString.charAt(0))) {
-            inverseCaseFirstChar = Character.toLowerCase(camelCaseString.charAt(0));
-        } else {
-            inverseCaseFirstChar = Character.toUpperCase(camelCaseString.charAt(0));
-        }
-        return inverseCaseFirstChar + camelCaseString.substring(1);
+        return retval;
     }
 
     // Utility to get the node type from a string. Useful when parsing type from JSON.

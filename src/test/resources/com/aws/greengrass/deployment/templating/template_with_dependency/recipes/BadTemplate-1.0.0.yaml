@@ -1,0 +1,8 @@
+---
+RecipeFormatVersion: '2020-01-25'
+ComponentName: BadTemplate
+ComponentVersion: '1.0.0'
+ComponentDescription: Template with dependency
+ComponentDependencies:
+  SomeOtherTemplate:
+    VersionRequirement: 2.1.0

@@ -3,8 +3,6 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-package com.aws.greengrass.deployment.templating.transformers;
-
 import com.amazon.aws.iot.greengrass.component.common.ComponentRecipe;
 import com.amazon.aws.iot.greengrass.component.common.ComponentType;
 import com.amazon.aws.iot.greengrass.component.common.Platform;
@@ -23,29 +21,30 @@ public class EchoTransformer extends RecipeTransformer {
     private static final String COMPONENT_DESCRIPTION = "Component expanded with EchoTransformer";
     private static final String COMPONENT_PUBLISHER = "Me";
 
+    /*
+      param1:
+        type: string
+        required: true
+      param2:
+        type: string
+        required: true
+     */
     @SuppressWarnings("PMD.AvoidDuplicateLiterals")
     private static final String TEMPLATE_SCHEMA = "{\n" + "  \"param1\": {\n" + "    \"type\": \"string\",\n"
             + "    \"required\": true\n" + "  },\n" + "  \"param2\": {\n" + "    \"type\": \"string\",\n"
-            + "    \"required\": true\n" + "  },\n" + "  \"resetParam1\": {\n" + "    \"type\": \"string\",\n"
-            + "    \"required\": false\n" + "  },\n" + "  \"resetParam2\": {\n" + "    \"type\": \"string\",\n"
             + "    \"required\": true\n" + "  },\n" + "}";
 
     @Override
-    protected JsonNode initTemplateSchema() throws TemplateParameterException {
-        try {
-            return RECIPE_SERIALIZER.readTree(TEMPLATE_SCHEMA);
-        } catch (JsonProcessingException e) {
-            throw new TemplateParameterException(e);
-        }
+    protected String initTemplateSchema() {
+        return TEMPLATE_SCHEMA;
     }
 
     // generate a component recipe from a list of well-behaved parameters
     @Override
     public ComponentRecipe transform(ComponentRecipe paramFile, JsonNode componentConfig) {
         Map<String, Object> newLifecyle = new HashMap<>();
-        String runString = "echo Param1: " + componentConfig.get("param1").asText() + " Param2: " + componentConfig.get(
-                "param2").asText() + " ResetParam1: " + componentConfig.get("resetParam1").asText() + " ResetParam2: "
-                + componentConfig.get("resetParam2").asText();
+        String runString = String.format("echo Param1: %s Param2: %s",
+                componentConfig.get("param1").asText(), componentConfig.get("param2").asText());
         newLifecyle.put("run", runString);
 
         PlatformSpecificManifest manifest =

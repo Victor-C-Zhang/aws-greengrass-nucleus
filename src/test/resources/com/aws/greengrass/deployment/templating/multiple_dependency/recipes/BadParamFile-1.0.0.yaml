@@ -1,0 +1,10 @@
+---
+RecipeFormatVersion: '2020-01-25'
+ComponentName: BadParamFile
+ComponentPublisher: Me
+ComponentVersion: '1.0.0'
+ComponentDependencies:
+  ATemplate:
+    VersionRequirement: '1.0.0'
+  BTemplate:
+    VersionRequirement: '4.2.0'

@@ -1,0 +1,8 @@
+---
+RecipeFormatVersion: '2020-01-25'
+ComponentName: ThirdOne
+ComponentPublisher: Me
+ComponentVersion: '1.0.0'
+ComponentDependencies:
+  ThirdTemplate:
+    VersionRequirement: '1.0.0'

@@ -1,0 +1,8 @@
+---
+RecipeFormatVersion: '2020-01-25'
+ComponentName: FirstTwo
+ComponentPublisher: Me
+ComponentVersion: '2.1.2'
+ComponentDependencies:
+  FirstTemplate:
+    VersionRequirement: '<1.1.0'
