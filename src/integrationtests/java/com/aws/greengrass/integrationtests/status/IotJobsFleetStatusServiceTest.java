@@ -35,7 +35,6 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.exc.UnrecognizedPropertyException;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.api.extension.ExtensionContext;
@@ -166,7 +165,6 @@ class IotJobsFleetStatusServiceTest extends BaseITCase {
         kernel.shutdown();
     }
 
-    @Disabled("Skip to see if coverage is good")
     @Test
     void GIVEN_jobs_deployment_WHEN_deployment_finishes_THEN_status_is_uploaded_to_cloud(ExtensionContext context) throws Exception {
         ignoreExceptionOfType(context, InvocationTargetException.class);
@@ -220,7 +218,6 @@ class IotJobsFleetStatusServiceTest extends BaseITCase {
         Slf4jLogAdapter.removeGlobalListener(logListener);
     }
 
-    @Disabled("Skip to see if coverage is good")
     @Test
     void WHEN_deployment_bumps_up_component_version_THEN_status_of_new_version_is_updated_to_cloud() throws Exception {
         ((Map) kernel.getContext().getvIfExists(Kernel.SERVICE_TYPE_TO_CLASS_MAP_KEY).get()).put("plugin",
