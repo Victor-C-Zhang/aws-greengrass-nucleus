@@ -17,9 +17,12 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.security.AccessController;
 import java.security.PrivilegedAction;
+import java.util.Enumeration;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
+import java.util.jar.JarEntry;
+import java.util.jar.JarFile;
 
 public class TransformerWrapper {
     RecipeTransformer transformer;
@@ -46,6 +49,9 @@ public class TransformerWrapper {
             transformerClass.set((Class<RecipeTransformer>) c);
         });
         try {
+            JarFile jarFile = new JarFile(String.valueOf(pathToExecutable));
+            String classExt = ".class";
+            Enumeration<JarEntry> enumeration = jarFile.entries();
             URL[] urls = {pathToExecutable.toUri().toURL()};
             AccessController.doPrivileged((PrivilegedAction<Void>) () -> {
                 URLClassLoader cl = new URLClassLoader(urls);
@@ -54,6 +60,21 @@ public class TransformerWrapper {
                 sc.overrideClassLoaders(cl);
                 matcher.accept(sc);
                 sc.scan(context.get(ExecutorService.class), 1);
+
+                while (enumeration.hasMoreElements()) {
+                    JarEntry je = enumeration.nextElement();
+                    if (je.isDirectory() || !je.getName().endsWith(classExt)) {
+                        continue;
+                    }
+                    String className = je.getName().substring(0,je.getName().length() - classExt.length());
+                    className = className.replace('/', '.');
+                    try {
+                        cl.loadClass(className);
+                    } catch (ClassNotFoundException e) {
+                        throw new RuntimeException(e);
+                    }
+                }
+
                 try {
                     cl.close();
                 } catch (IOException e) {
@@ -61,6 +82,7 @@ public class TransformerWrapper {
                 }
                 return null;
             });
+            jarFile.close();
         } catch (IOException | RuntimeException e) {
             throw new RecipeTransformerException(e);
         }

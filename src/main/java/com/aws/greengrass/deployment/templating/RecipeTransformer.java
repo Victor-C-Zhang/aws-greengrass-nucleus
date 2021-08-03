@@ -129,8 +129,9 @@ public abstract class RecipeTransformer {
             }
             JsonNode defaultVal = defaultNode.get(field);
             if (nodeType(templateSchema.get(field).get(TEMPLATE_FIELD_TYPE_KEY).asText()) != defaultVal.getNodeType()) {
-                throw new TemplateParameterTypeMismatchException("Template default value does not match schema. "
-                        + "Expected " + nodeType(templateSchema.get(field).get(TEMPLATE_FIELD_TYPE_KEY).asText())
+                throw new TemplateParameterTypeMismatchException("Template default for '" + field
+                        + "' does not match schema. Expected "
+                        + nodeType(templateSchema.get(field).get(TEMPLATE_FIELD_TYPE_KEY).asText())
                         + " but got " + defaultNode.getNodeType());
             }
         }
