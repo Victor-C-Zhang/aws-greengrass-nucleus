@@ -1,0 +1,7 @@
+---
+recipeFormatVersion: 2020-01-25
+componentName: ADependentTemplate
+componentVersion: '1.0.0'
+componentConfiguration:
+  defaultConfiguration:
+    parameterSchema: {}

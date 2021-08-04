@@ -16,3 +16,14 @@
 
 ### `ATemplate` transformer jar
 - [EchoTransformer](transformers/EchoTransformer.java)
+
+### `ADependentTemplate` transformer jar
+- [DependentTransformer](transformers/ADependentTransformer/DependentTransformer.java)
+- [DependentModel](transformers/ADependentTransformer/DependentModel.java)
+
+### `BDependentTemplate` transformer jar
+- [DependentTransformer](transformers/BDependentTransformer/DependentTransformer.java) (different from the file in 
+  `ADependentTemplate`)
+- [DependentModel](transformers/BDependentTransformer/DependentModel.java) (different from the file in 
+  `ADependentTemplate`)
+- [CustomString](transformers/BDependentTransformer/CustomString.java)
