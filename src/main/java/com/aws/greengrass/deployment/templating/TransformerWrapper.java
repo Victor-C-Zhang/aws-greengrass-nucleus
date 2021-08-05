@@ -17,12 +17,9 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.security.AccessController;
 import java.security.PrivilegedAction;
-import java.util.Enumeration;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
-import java.util.jar.JarEntry;
-import java.util.jar.JarFile;
 
 public class TransformerWrapper {
     RecipeTransformer transformer;
@@ -42,16 +39,16 @@ public class TransformerWrapper {
                     + pathToExecutable);
         }
         AtomicReference<Class<RecipeTransformer>> transformerClass = new AtomicReference<>();
-        Consumer<FastClasspathScanner> matcher = sc -> sc.matchSubclassesOf(RecipeTransformer.class, c -> {
-            if (transformerClass.get() != null) {
-                throw new RuntimeException("Found more than one candidate transformer class.");
+
+        Consumer<FastClasspathScanner> matcher = sc -> sc.matchAllClasses(c -> {
+            if (RecipeTransformer.class.isAssignableFrom(c) && !c.equals(RecipeTransformer.class)) {
+                if (transformerClass.get() != null) {
+                    throw new RuntimeException("Found more than one candidate transformer class.");
+                }
+                transformerClass.set((Class<RecipeTransformer>) c);
             }
-            transformerClass.set((Class<RecipeTransformer>) c);
         });
         try {
-            JarFile jarFile = new JarFile(String.valueOf(pathToExecutable));
-            String classExt = ".class";
-            Enumeration<JarEntry> enumeration = jarFile.entries();
             URL[] urls = {pathToExecutable.toUri().toURL()};
             AccessController.doPrivileged((PrivilegedAction<Void>) () -> {
                 URLClassLoader cl = new URLClassLoader(urls);
@@ -61,20 +58,6 @@ public class TransformerWrapper {
                 matcher.accept(sc);
                 sc.scan(context.get(ExecutorService.class), 1);
 
-                while (enumeration.hasMoreElements()) {
-                    JarEntry je = enumeration.nextElement();
-                    if (je.isDirectory() || !je.getName().endsWith(classExt)) {
-                        continue;
-                    }
-                    String className = je.getName().substring(0,je.getName().length() - classExt.length());
-                    className = className.replace('/', '.');
-                    try {
-                        cl.loadClass(className);
-                    } catch (ClassNotFoundException e) {
-                        throw new RuntimeException(e);
-                    }
-                }
-
                 try {
                     cl.close();
                 } catch (IOException e) {
@@ -82,7 +65,6 @@ public class TransformerWrapper {
                 }
                 return null;
             });
-            jarFile.close();
         } catch (IOException | RuntimeException e) {
             throw new RecipeTransformerException(e);
         }
