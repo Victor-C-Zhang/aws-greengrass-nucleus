@@ -19,7 +19,8 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 
-public class EchoTransformer extends RecipeTransformer {
+// doesn't extend recipe transformer
+public class NoImplementedTransformer {
     private static final String COMPONENT_DESCRIPTION = "Component expanded with EchoTransformer";
     private static final String COMPONENT_PUBLISHER = "Me";
 
@@ -36,13 +37,11 @@ public class EchoTransformer extends RecipeTransformer {
             + "    \"required\": true\n" + "  },\n" + "  \"param2\": {\n" + "    \"type\": \"string\",\n"
             + "    \"required\": true\n" + "  },\n" + "}";
 
-    @Override
     protected String initTemplateSchema() {
         return TEMPLATE_SCHEMA;
     }
 
     // generate a component recipe from a list of well-behaved parameters
-    @Override
     public ComponentRecipe transform(ComponentRecipe paramFile, JsonNode componentConfig) {
         Map<String, Object> newLifecyle = new HashMap<>();
         String runString = String.format("echo Param1: %s Param2: %s",

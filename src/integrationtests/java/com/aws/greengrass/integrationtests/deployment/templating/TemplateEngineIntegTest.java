@@ -93,13 +93,6 @@ public class TemplateEngineIntegTest extends BaseITCase {
 
         FleetStatusService fleetStatusService = (FleetStatusService) kernel.locate(FLEET_STATUS_SERVICE_TOPICS);
         fleetStatusService.getIsConnected().set(false);
-        // pre-load contents to package store
-        localStoreContentPath =
-                Paths.get(TemplateEngineIntegTest.class.getResource(".").toURI());
-        PreloadComponentStoreHelper.preloadRecipesFromTestResourceDir(localStoreContentPath.resolve("recipes"),
-                kernel.getNucleusPaths().recipePath());
-        copyFolderRecursively(localStoreContentPath.resolve("artifacts"), kernel.getNucleusPaths().artifactPath(),
-                REPLACE_EXISTING);
     }
 
     @AfterEach
@@ -111,6 +104,15 @@ public class TemplateEngineIntegTest extends BaseITCase {
 
     @Test
     void WHEN_a_local_deployment_has_templates_THEN_they_are_expanded_properly() throws Exception {
+        // pre-load contents to package store
+        localStoreContentPath =
+                Paths.get(TemplateEngineIntegTest.class.getResource("nondependent").toURI());
+        PreloadComponentStoreHelper.preloadRecipesFromTestResourceDir(localStoreContentPath.resolve("recipes"),
+                kernel.getNucleusPaths().recipePath());
+        copyFolderRecursively(localStoreContentPath.resolve("artifacts"), kernel.getNucleusPaths().artifactPath(),
+                REPLACE_EXISTING);
+        renameTestTransformerJarsToTransformerJars(localStoreContentPath.resolve("artifacts"));
+
         CountDownLatch firstDeploymentCDL = new CountDownLatch(1);
         DeploymentStatusKeeper deploymentStatusKeeper = kernel.getContext().get(DeploymentStatusKeeper.class);
         deploymentStatusKeeper.registerDeploymentStatusConsumer(Deployment.DeploymentType.LOCAL, (status) -> {
@@ -146,6 +148,15 @@ public class TemplateEngineIntegTest extends BaseITCase {
 
     @Test
     void WHEN_multiple_local_deployments_are_requested_THEN_templating_works_for_all_deployments() throws Exception {
+        // pre-load contents to package store
+        localStoreContentPath =
+                Paths.get(TemplateEngineIntegTest.class.getResource("nondependent").toURI());
+        PreloadComponentStoreHelper.preloadRecipesFromTestResourceDir(localStoreContentPath.resolve("recipes"),
+                kernel.getNucleusPaths().recipePath());
+        copyFolderRecursively(localStoreContentPath.resolve("artifacts"), kernel.getNucleusPaths().artifactPath(),
+                REPLACE_EXISTING);
+        renameTestTransformerJarsToTransformerJars(localStoreContentPath.resolve("artifacts"));
+
         CountDownLatch firstDeploymentCDL = new CountDownLatch(1);
         CountDownLatch secondDeploymentCDL = new CountDownLatch(1);
         DeploymentStatusKeeper deploymentStatusKeeper = kernel.getContext().get(DeploymentStatusKeeper.class);
@@ -195,6 +206,47 @@ public class TemplateEngineIntegTest extends BaseITCase {
         assertTrue(secondDeploymentCDL.await(10, TimeUnit.SECONDS), "Second templating deployment did not succeed");
     }
 
+    @Test
+    void WHEN_multiple_expansions_require_auxiliary_classes_THEN_identically_named_classes_dont_clash() throws Exception {
+        // pre-load contents to package store
+        localStoreContentPath =
+                Paths.get(TemplateEngineIntegTest.class.getResource("dependent").toURI());
+        PreloadComponentStoreHelper.preloadRecipesFromTestResourceDir(localStoreContentPath.resolve("recipes"),
+                kernel.getNucleusPaths().recipePath());
+        copyFolderRecursively(localStoreContentPath.resolve("artifacts"), kernel.getNucleusPaths().artifactPath(),
+                REPLACE_EXISTING);
+        renameTestTransformerJarsToTransformerJars(localStoreContentPath.resolve("artifacts"));
+
+        CountDownLatch firstDeploymentCDL = new CountDownLatch(1);
+        DeploymentStatusKeeper deploymentStatusKeeper = kernel.getContext().get(DeploymentStatusKeeper.class);
+        deploymentStatusKeeper.registerDeploymentStatusConsumer(Deployment.DeploymentType.LOCAL, (status) -> {
+            if (status.get(DEPLOYMENT_ID_KEY_NAME).equals("templatingDeployment") &&
+                    status.get(DEPLOYMENT_STATUS_KEY_NAME).equals("SUCCEEDED")){
+                verifyDependentDeployment();
+                firstDeploymentCDL.countDown();
+            }
+            return true;
+        },"TemplateEngineIntegTest");
+
+        String recipeDir = localStoreContentPath.resolve("recipes").toAbsolutePath().toString();
+        String artifactsDir = localStoreContentPath.resolve("artifacts").toAbsolutePath().toString();
+        Map<String, String> componentsToMerge = new HashMap<>();
+        componentsToMerge.put("ADependent", "1.0.0");
+        componentsToMerge.put("BDependent", "1.0.0");
+
+        Map<String, ConfigurationUpdateOperation> updateConfig = new HashMap<>();
+
+        LocalOverrideRequest request = LocalOverrideRequest.builder().requestId("templatingDeployment")
+                .componentsToMerge(componentsToMerge)
+                .requestTimestamp(System.currentTimeMillis())
+                .configurationUpdate(updateConfig)
+                .recipeDirectoryPath(recipeDir).artifactsDirectoryPath(artifactsDir).build();
+
+        submitLocalDocument(request);
+
+        assertTrue(firstDeploymentCDL.await(10, TimeUnit.SECONDS), "Templating deployment did not succeed");
+    }
+
     // reach into component store to verify
     private void verifyLoggerDeployment() {
         try (Stream<Path> files = Files.walk(kernel.getNucleusPaths().recipePath())) {
@@ -240,8 +292,46 @@ public class TemplateEngineIntegTest extends BaseITCase {
         }
     }
 
+    private void verifyDependentDeployment() {
+        try (Stream<Path> files = Files.walk(kernel.getNucleusPaths().recipePath())) {
+            for (Path r : files.collect(Collectors.toList())) {
+                if (!Files.isDirectory(r)) {
+                    ComponentRecipe recipe = getRecipeSerializer().readValue(r.toFile(), ComponentRecipe.class);
+                    switch (recipe.getComponentName()) {
+                        case "ADependent": {
+                            assertEquals("echo Field: field Integer: 14",
+                                    recipe.getManifests().get(0).getLifecycle().get("run"));
+                            break;
+                        }
+                        case "BDependent": {
+                            assertEquals("echo Field: folddlof Integer: 42",
+                                    recipe.getManifests().get(0).getLifecycle().get("run"));
+                            break;
+                        }
+                        default: {
+                            fail("Found recipe file other than ADependent, BDependent");
+                            break;
+                        }
+                    }
+                }
+            }
+        } catch (IOException e) {
+            fail(e);
+        }
+    }
+
     private void submitLocalDocument(LocalOverrideRequest request) throws Exception {
         Deployment deployment = new Deployment(OBJECT_MAPPER.writeValueAsString(request), Deployment.DeploymentType.LOCAL, request.getRequestId());
         deploymentQueue.offer(deployment);
+    }
+
+    private void renameTestTransformerJarsToTransformerJars(Path artifactsDir) throws IOException {
+        try (Stream<Path> files = Files.walk(artifactsDir)) {
+            for (Path r : files.collect(Collectors.toList())) {
+                if (!r.toFile().isDirectory() && "transformer-tests.jar".equals(r.getFileName().toString())) {
+                    Files.move(r, r.resolveSibling("transformer.jar"));
+                }
+            }
+        }
     }
 }

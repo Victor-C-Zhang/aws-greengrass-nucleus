@@ -1,0 +1,7 @@
+---
+recipeFormatVersion: 2020-01-25
+componentName: BDependent
+componentVersion: '1.0.0'
+componentDependencies:
+  BDependentTemplate:
+    versionRequirement: '1.0.0'

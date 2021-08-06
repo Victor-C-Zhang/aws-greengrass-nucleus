@@ -53,7 +53,7 @@ public class TransformWrapperIntegTest extends BaseITCase {
     void GIVEN_jar_with_no_transformer_WHEN_try_instantiation_THEN_throw_transformer_exception()
             throws URISyntaxException {
         Path noImplementedTransformer =
-                Paths.get(getClass().getResource("no-implemented-transformer.jar").toURI());
+                Paths.get(getClass().getResource("no-implemented-transformer-tests.jar").toURI());
         RecipeTransformerException ex = assertThrows(RecipeTransformerException.class,
                 () -> new TransformerWrapper(noImplementedTransformer, templateRecipe, context));
         assertThat(ex.getMessage(), containsString("Could not find a candidate transformer class for template"));
@@ -62,7 +62,7 @@ public class TransformWrapperIntegTest extends BaseITCase {
     @Test
     void GIVEN_jar_with_more_than_one_transformer_WHEN_try_instantiation_THEN_throw_exception()
             throws URISyntaxException {
-        Path multipleTransformer = Paths.get(getClass().getResource("multiple-transformer.jar").toURI());
+        Path multipleTransformer = Paths.get(getClass().getResource("multiple-transformer-tests.jar").toURI());
         RecipeTransformerException ex2 = assertThrows(RecipeTransformerException.class,
                 () -> new TransformerWrapper(multipleTransformer, templateRecipe, context));
         assertThat(ex2.getMessage(), containsString("Found more than one candidate transformer class"));
@@ -71,7 +71,7 @@ public class TransformWrapperIntegTest extends BaseITCase {
     void GIVEN_jar_with_faulty_transformer_WHEN_try_instantiation_THEN_throw_exception()
             throws URISyntaxException {
         // something goes wrong with transformer init
-        Path errorTransformer = Paths.get(getClass().getResource("error-transformer.jar").toURI());
+        Path errorTransformer = Paths.get(getClass().getResource("error-transformer-tests.jar").toURI());
         RecipeTransformerException ex3 = assertThrows(RecipeTransformerException.class,
                 () -> new TransformerWrapper(errorTransformer, templateRecipe, context));
         assertThat(ex3.getMessage(), containsString("Could not instantiate the transformer"));

@@ -39,11 +39,14 @@ public class TransformerWrapper {
                     + pathToExecutable);
         }
         AtomicReference<Class<RecipeTransformer>> transformerClass = new AtomicReference<>();
-        Consumer<FastClasspathScanner> matcher = sc -> sc.matchSubclassesOf(RecipeTransformer.class, c -> {
-            if (transformerClass.get() != null) {
-                throw new RuntimeException("Found more than one candidate transformer class.");
+
+        Consumer<FastClasspathScanner> matcher = sc -> sc.matchAllClasses(c -> {
+            if (RecipeTransformer.class.isAssignableFrom(c) && !c.equals(RecipeTransformer.class)) {
+                if (transformerClass.get() != null) {
+                    throw new RuntimeException("Found more than one candidate transformer class.");
+                }
+                transformerClass.set((Class<RecipeTransformer>) c);
             }
-            transformerClass.set((Class<RecipeTransformer>) c);
         });
         try {
             URL[] urls = {pathToExecutable.toUri().toURL()};
@@ -54,6 +57,7 @@ public class TransformerWrapper {
                 sc.overrideClassLoaders(cl);
                 matcher.accept(sc);
                 sc.scan(context.get(ExecutorService.class), 1);
+
                 try {
                     cl.close();
                 } catch (IOException e) {
