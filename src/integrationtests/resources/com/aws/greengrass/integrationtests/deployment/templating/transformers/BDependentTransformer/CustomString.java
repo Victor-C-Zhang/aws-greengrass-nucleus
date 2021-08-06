@@ -1,3 +1,5 @@
+package com.aws.greengrass.integrationtests.deployment.templating.transformers.BDependentTransformer;
+
 public class CustomString {
     private final String val;
 

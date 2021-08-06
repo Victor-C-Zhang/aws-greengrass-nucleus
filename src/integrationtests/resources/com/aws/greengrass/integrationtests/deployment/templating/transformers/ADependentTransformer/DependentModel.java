@@ -1,3 +1,5 @@
+package com.aws.greengrass.integrationtests.deployment.templating.transformers.ADependentTransformer;
+
 public class DependentModel {
     private final String field;
     private final Integer integer;

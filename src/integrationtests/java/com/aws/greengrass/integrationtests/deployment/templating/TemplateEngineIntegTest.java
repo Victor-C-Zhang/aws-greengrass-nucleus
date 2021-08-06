@@ -111,6 +111,7 @@ public class TemplateEngineIntegTest extends BaseITCase {
                 kernel.getNucleusPaths().recipePath());
         copyFolderRecursively(localStoreContentPath.resolve("artifacts"), kernel.getNucleusPaths().artifactPath(),
                 REPLACE_EXISTING);
+        renameTestTransformerJarsToTransformerJars(localStoreContentPath.resolve("artifacts"));
 
         CountDownLatch firstDeploymentCDL = new CountDownLatch(1);
         DeploymentStatusKeeper deploymentStatusKeeper = kernel.getContext().get(DeploymentStatusKeeper.class);
@@ -154,6 +155,7 @@ public class TemplateEngineIntegTest extends BaseITCase {
                 kernel.getNucleusPaths().recipePath());
         copyFolderRecursively(localStoreContentPath.resolve("artifacts"), kernel.getNucleusPaths().artifactPath(),
                 REPLACE_EXISTING);
+        renameTestTransformerJarsToTransformerJars(localStoreContentPath.resolve("artifacts"));
 
         CountDownLatch firstDeploymentCDL = new CountDownLatch(1);
         CountDownLatch secondDeploymentCDL = new CountDownLatch(1);
@@ -213,6 +215,7 @@ public class TemplateEngineIntegTest extends BaseITCase {
                 kernel.getNucleusPaths().recipePath());
         copyFolderRecursively(localStoreContentPath.resolve("artifacts"), kernel.getNucleusPaths().artifactPath(),
                 REPLACE_EXISTING);
+        renameTestTransformerJarsToTransformerJars(localStoreContentPath.resolve("artifacts"));
 
         CountDownLatch firstDeploymentCDL = new CountDownLatch(1);
         DeploymentStatusKeeper deploymentStatusKeeper = kernel.getContext().get(DeploymentStatusKeeper.class);
@@ -320,5 +323,15 @@ public class TemplateEngineIntegTest extends BaseITCase {
     private void submitLocalDocument(LocalOverrideRequest request) throws Exception {
         Deployment deployment = new Deployment(OBJECT_MAPPER.writeValueAsString(request), Deployment.DeploymentType.LOCAL, request.getRequestId());
         deploymentQueue.offer(deployment);
+    }
+
+    private void renameTestTransformerJarsToTransformerJars(Path artifactsDir) throws IOException {
+        try (Stream<Path> files = Files.walk(artifactsDir)) {
+            for (Path r : files.collect(Collectors.toList())) {
+                if (!r.toFile().isDirectory() && "transformer-tests.jar".equals(r.getFileName().toString())) {
+                    Files.move(r, r.resolveSibling("transformer.jar"));
+                }
+            }
+        }
     }
 }

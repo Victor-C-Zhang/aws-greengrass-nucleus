@@ -1,3 +1,5 @@
+package com.aws.greengrass.integrationtests.deployment.templating.transformers.BDependentTransformer;
+
 public class DependentModel {
     private final CustomString field;
     private final Integer integer;
