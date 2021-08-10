@@ -6,6 +6,7 @@
 package com.aws.greengrass.deployment.templating;
 
 import com.amazon.aws.iot.greengrass.component.common.ComponentRecipe;
+import com.amazon.aws.iot.greengrass.component.common.ComponentType;
 import com.amazon.aws.iot.greengrass.component.common.DependencyProperties;
 import com.amazon.aws.iot.greengrass.component.common.PlatformSpecificManifest;
 import com.aws.greengrass.componentmanager.ComponentStore;
@@ -39,7 +40,6 @@ import static com.aws.greengrass.deployment.DeploymentService.parseFile;
  */
 public class TemplateEngine {
     public static final String PARSER_JAR = "transformer.jar";
-    private static final String TEMPLATE_TEMP_IDENTIFIER = "Template"; // TODO: get rid of this once template type is in
 
     private final ComponentStore componentStore;
     private final NucleusPaths nucleusPaths;
@@ -133,7 +133,7 @@ public class TemplateEngine {
         ComponentIdentifier identifier = new ComponentIdentifier(recipe.getComponentName(),
                 recipe.getComponentVersion());
         mapOfComponentIdentifierToRecipe.put(identifier, recipe);
-        if (recipe.getComponentName().endsWith(TEMPLATE_TEMP_IDENTIFIER)) { // TODO: same as above
+        if (recipe.getComponentType().equals(ComponentType.TEMPLATE)) {
             mapOfTemplateNameToTemplateIdentifier.put(recipe.getComponentName(), identifier);
         }
     }
@@ -155,8 +155,20 @@ public class TemplateEngine {
         }
         boolean paramFileAlreadyHasDependency = false; // a parameter file can only have one template dependency
         for (Map.Entry<String, DependencyProperties> dependencyEntry : deps.entrySet()) {
-            if (dependencyEntry.getKey().endsWith(TEMPLATE_TEMP_IDENTIFIER)) { // TODO: same as above
-                if (identifier.getName().endsWith(TEMPLATE_TEMP_IDENTIFIER)) { // TODO: here too
+            ComponentIdentifier templateId =
+                    mapOfTemplateNameToTemplateIdentifier.get(dependencyEntry.getKey());
+            if (templateId == null) {
+                if (dependencyEntry.getKey().endsWith("Template")) {
+                    throw new IllegalTemplateDependencyException("Component " + identifier.getName() + " depends on a "
+                            + "version of " + dependencyEntry.getKey() + " that can't be found locally. Requirement is "
+                            + dependencyEntry.getValue().getVersionRequirement());
+                }
+                continue;
+            }
+            ComponentType depType = mapOfComponentIdentifierToRecipe.get(templateId).getComponentType();
+            ComponentType identifierType = recipe.getComponentType();
+            if (ComponentType.TEMPLATE.equals(depType)) {
+                if (ComponentType.TEMPLATE.equals(identifierType)) {
                     throw new IllegalTemplateDependencyException("Illegal dependency for template "
                             + identifier.getName() + ". Templates cannot depend on other templates");
                 }
@@ -167,12 +179,6 @@ public class TemplateEngine {
 
                 // assume we're provided all the right components and the versions match properly.
                 // TODO: allow for dependency resolution of template versions
-                ComponentIdentifier templateId = mapOfTemplateNameToTemplateIdentifier.get(dependencyEntry.getKey());
-                if (templateId == null) {
-                    throw new IllegalTemplateDependencyException("Component " + identifier.getName() + " depends on a "
-                            + "version of " + dependencyEntry.getKey() + " that can't be found locally. Requirement is "
-                            + dependencyEntry.getValue().getVersionRequirement());
-                }
                 if (!dependencyEntry.getValue().getVersionRequirement().isSatisfiedBy(templateId.getVersion())) {
                     throw new IllegalTemplateDependencyException("Component " + identifier.getName() + " depends on a"
                             + " version of " + templateId.getName() + " that can't be found locally. Requirement is "

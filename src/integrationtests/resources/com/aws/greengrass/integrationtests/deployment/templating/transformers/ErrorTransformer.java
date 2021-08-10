@@ -8,8 +8,6 @@ package com.aws.greengrass.integrationtests.deployment.templating.transformers;
 import com.amazon.aws.iot.greengrass.component.common.ComponentRecipe;
 import com.aws.greengrass.deployment.templating.RecipeTransformer;
 import com.aws.greengrass.deployment.templating.exceptions.RecipeTransformerException;
-import com.aws.greengrass.deployment.templating.exceptions.TemplateParameterException;
-import com.fasterxml.jackson.databind.JsonNode;
 
 public class ErrorTransformer extends RecipeTransformer {
     @Override
@@ -18,7 +16,12 @@ public class ErrorTransformer extends RecipeTransformer {
     }
 
     @Override
-    public ComponentRecipe transform(ComponentRecipe paramFile, JsonNode componentParams)
+    protected Class<?> initRecievingClass() {
+        return null; // should actually be non-null in production
+    }
+
+    @Override
+    public ComponentRecipe transform(ComponentRecipe paramFile, Object componentParamsObj)
             throws RecipeTransformerException {
         return null;
     }

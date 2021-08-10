@@ -10,9 +10,6 @@ import com.amazon.aws.iot.greengrass.component.common.ComponentType;
 import com.amazon.aws.iot.greengrass.component.common.Platform;
 import com.amazon.aws.iot.greengrass.component.common.PlatformSpecificManifest;
 import com.amazon.aws.iot.greengrass.component.common.RecipeFormatVersion;
-import com.aws.greengrass.deployment.templating.RecipeTransformer;
-import com.aws.greengrass.deployment.templating.exceptions.TemplateParameterException;
-import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 
 import java.util.Collections;

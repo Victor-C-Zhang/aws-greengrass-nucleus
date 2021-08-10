@@ -1,3 +1,8 @@
+/*
+ * Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
 package com.aws.greengrass.integrationtests.deployment.templating.transformers.ADependentTransformer;
 
 import com.amazon.aws.iot.greengrass.component.common.ComponentRecipe;
@@ -7,7 +12,6 @@ import com.amazon.aws.iot.greengrass.component.common.PlatformSpecificManifest;
 import com.amazon.aws.iot.greengrass.component.common.RecipeFormatVersion;
 import com.aws.greengrass.deployment.templating.RecipeTransformer;
 import com.aws.greengrass.deployment.templating.exceptions.RecipeTransformerException;
-import com.fasterxml.jackson.databind.JsonNode;
 
 import java.util.Collections;
 import java.util.HashMap;
@@ -20,7 +24,12 @@ public class DependentTransformer extends RecipeTransformer {
     }
 
     @Override
-    public ComponentRecipe transform(ComponentRecipe paramFile, JsonNode componentParams)
+    protected Class<?> initRecievingClass() {
+        return Void.class;
+    }
+
+    @Override
+    public ComponentRecipe transform(ComponentRecipe paramFile, Object componentParamsObj)
             throws RecipeTransformerException {
         DependentModel dep = new DependentModel("field", 14);
         Map<String, Object> newLifecyle = new HashMap<>();

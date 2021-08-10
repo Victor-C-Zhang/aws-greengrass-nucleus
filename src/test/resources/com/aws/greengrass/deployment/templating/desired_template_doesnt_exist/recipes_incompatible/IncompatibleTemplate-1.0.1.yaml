@@ -2,4 +2,5 @@
 RecipeFormatVersion: '2020-01-25'
 ComponentName: IncompatibleTemplate
 ComponentPublisher: Me
+ComponentType: aws.greengrass.template
 ComponentVersion: '1.0.1'

@@ -2,6 +2,7 @@
 RecipeFormatVersion: '2020-01-25'
 ComponentName: LifecycleTemplate
 ComponentVersion: '1.0.0'
+ComponentType: aws.greengrass.template
 ComponentDescription: Template with top-level lifecycle key
 Lifecycle:
   Setenv:

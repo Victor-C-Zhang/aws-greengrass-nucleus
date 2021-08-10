@@ -5,20 +5,16 @@
 
 package com.aws.greengrass.deployment.templating;
 
-import com.amazon.aws.iot.greengrass.component.common.ComponentConfiguration;
 import com.amazon.aws.iot.greengrass.component.common.ComponentRecipe;
-import com.aws.greengrass.deployment.templating.exceptions.IllegalTemplateParameterException;
-import com.aws.greengrass.deployment.templating.exceptions.MissingTemplateParameterException;
+import com.amazon.aws.iot.greengrass.component.common.TemplateParameter;
+import com.amazon.aws.iot.greengrass.component.common.TemplateParameterSchema;
+import com.amazon.aws.iot.greengrass.component.common.TemplateParameterType;
 import com.aws.greengrass.deployment.templating.exceptions.RecipeTransformerException;
 import com.aws.greengrass.deployment.templating.exceptions.TemplateParameterException;
-import com.aws.greengrass.deployment.templating.exceptions.TemplateParameterTypeMismatchException;
 import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.node.JsonNodeType;
-import com.fasterxml.jackson.databind.node.ObjectNode;
-import lombok.Getter;
 
-import java.util.Iterator;
+import java.util.HashMap;
+import java.util.Map;
 import javax.annotation.Nullable;
 
 import static com.amazon.aws.iot.greengrass.component.common.SerializerFactory.getRecipeSerializer;
@@ -28,38 +24,58 @@ import static com.amazon.aws.iot.greengrass.component.common.SerializerFactory.g
  * artifacts. Only maintains state for the template.
  */
 public abstract class RecipeTransformer {
-    // valid json data types
-    private static final String STRING_TYPE = "string";
-    private static final String NUMBER_TYPE = "number";
-    private static final String OBJECT_TYPE = "object";
-    private static final String ARRAY_TYPE = "array";
-    private static final String BOOLEAN_TYPE = "boolean";
-    private static final String NULL_TYPE = "null";
-
-    // TODO: should this be declared in an extension class to ComponentRecipe?
-    static final String TEMPLATE_PARAMETER_SCHEMA_KEY = "parameterSchema";
-    static final String TEMPLATE_DEFAULT_PARAMETER_KEY = "parameters";
-    static final String TEMPLATE_FIELD_REQUIRED_KEY = "required";
-    static final String TEMPLATE_FIELD_TYPE_KEY = "type";
-
-    private JsonNode templateSchema;
-    @Getter // for unit testing
-    private JsonNode effectiveDefaultConfig;
+    private TemplateParameterSchema templateSchema;
+    private Class<?> templateParametersShape;
 
     /**
      * Post-construction and injection, initialize the transformer with a template.
      * @param templateRecipe to extract default params, param schema.
-     * @throws TemplateParameterException if the template recipe or custom config is malformed.
+     * @throws TemplateParameterException if the template recipe schema or transformer-provided schema is malformed.
      */
-    @SuppressWarnings("PMD.AvoidCatchingGenericException")
     void initTemplateRecipe(ComponentRecipe templateRecipe) throws TemplateParameterException {
         try {
-            templateSchema = getRecipeSerializer().readTree(initTemplateSchema());
+            // init transformer-specific values
+            templateSchema = getRecipeSerializer().readValue(initTemplateSchema(), TemplateParameterSchema.class);
+            templateParametersShape = initRecievingClass();
+
+            // validate transformer-provided schema
+            boolean shouldError = false;
+            StringBuilder errorBuilder = new StringBuilder("Template transformer binary provided invalid schema:");
+            for (Map.Entry<String, TemplateParameter> entry : templateSchema.entrySet()) {
+                if (entry.getValue().getRequired() && entry.getValue().getDefaultValue() != null) {
+                    shouldError = true;
+                    errorBuilder.append("\nProvided default value for required field: ").append(entry.getKey());
+                    continue;
+                }
+                if (!entry.getValue().getRequired() && entry.getValue().getDefaultValue() == null) {
+                    shouldError = true;
+                    errorBuilder.append("\nDid not provide default value for optional field: ").append(entry.getKey());
+                    continue;
+                }
+                if (!entry.getValue().getRequired()) {
+                    TemplateParameterType actualType = extractType(entry.getValue().getDefaultValue());
+                    if (!entry.getValue().getType().equals(actualType)) {
+                        shouldError = true;
+                        errorBuilder.append("\nTemplate value for \"").append(entry.getKey())
+                                .append("\" does not match schema. Expected ").append(entry.getValue())
+                                .append(" but got ").append(actualType);
+                    }
+                }
+            }
+            if (shouldError) {
+                throw new TemplateParameterException(errorBuilder.toString());
+            }
         } catch (JsonProcessingException e) {
             throw new TemplateParameterException(e);
         }
-        effectiveDefaultConfig = getAndValidateTemplateComponentConfig(
-                templateRecipe.getComponentConfiguration().getDefaultConfiguration());
+
+        // validate template recipe schema
+        Map<String, TemplateParameter> recipeSchema = templateRecipe.getTemplateParameterSchema();
+        if (recipeSchema == null) {
+            validateTemplateComponentConfig(new TemplateParameterSchema());
+        } else {
+            validateTemplateComponentConfig(new TemplateParameterSchema(recipeSchema));
+        }
     }
 
     /**
@@ -70,163 +86,165 @@ public abstract class RecipeTransformer {
     protected abstract String initTemplateSchema();
 
     /**
+     * Method to declare the shape of the parameters the transformer uses.
+     * @return the user-defined data class representing the parameter structure to use for transformation.
+     */
+    protected abstract Class<?> initRecievingClass();
+
+    /**
      * Stateless expansion for one component.
      * @param parameterFile the parameter file for the component.
-     * @return a recipe. See the declaration for {@link #transform(ComponentRecipe, JsonNode) transform}.
+     * @return a recipe. See the declaration for {@link #transform(ComponentRecipe, Object) transform}.
      * @throws RecipeTransformerException if the provided parameters violate the template schema.
      */
     public ComponentRecipe execute(ComponentRecipe parameterFile) throws RecipeTransformerException {
-        JsonNode effectiveComponentParams = mergeAndValidateComponentParams(parameterFile);
+        Object effectiveComponentParams = mergeAndValidateComponentParams(parameterFile);
         return transform(parameterFile, effectiveComponentParams);
     }
 
     /**
      * Transforms the parameter file into a full recipe.
      * @param paramFile the parameter file object.
-     * @param componentParams the effective component parameters to use during expansion.
+     * @param componentParamsObj the effective component parameters to use during expansion, expressed as an object of
+     *                           type given by {@link #initRecievingClass()}.
      * @return the expanded recipe.
      * @throws RecipeTransformerException if there is any error with the transformation.
      */
-    public abstract ComponentRecipe transform(ComponentRecipe paramFile, JsonNode componentParams)
+    public abstract ComponentRecipe transform(ComponentRecipe paramFile, Object componentParamsObj)
             throws RecipeTransformerException;
 
     /**
-     * Note the configuration of the template itself. Validates provided defaults.
-     * @param defaultConfig the DefaultConfiguration recipe key.
+     * Validate the schema provided by the template recipe.
+     * @param recipeProvidedSchema the TemplateParameterSchema recipe key.
      * @throws TemplateParameterException if the template recipe file or given configuration is malformed.
      */
-    @SuppressWarnings("PMD.ForLoopCanBeForeach")
-    protected JsonNode getAndValidateTemplateComponentConfig(JsonNode defaultConfig) throws TemplateParameterException {
-        // validate schema in template matches internal schema, just for good measure
-        JsonNode recipeProvidedSchema = defaultConfig.get(TEMPLATE_PARAMETER_SCHEMA_KEY);
-        if (recipeProvidedSchema == null && templateSchema.size() != 0) {
-            throw new TemplateParameterException("Template recipe did not provide a schema but transformer requires "
-                    + "schema:\n" + templateSchema);
-        }
-        if (!templateSchema.equals(defaultConfig.get(TEMPLATE_PARAMETER_SCHEMA_KEY))) {
-            throw new TemplateParameterException("Template recipe provided schema different from template transformer"
-                    + " binary. Transformer needs schema:\n" + templateSchema.toString() + "\nTemplate provided "
-                    + "schema:\n" + defaultConfig.get(TEMPLATE_PARAMETER_SCHEMA_KEY).toString());
+    protected void validateTemplateComponentConfig(TemplateParameterSchema recipeProvidedSchema)
+            throws TemplateParameterException {
+        if (recipeProvidedSchema == null) {
+            recipeProvidedSchema = new TemplateParameterSchema();
         }
 
-        // validate hard-coded/user-provided "default configs"
-        JsonNode defaultNode = defaultConfig.get(TEMPLATE_DEFAULT_PARAMETER_KEY);
-        if (defaultNode == null) {
-            defaultNode = getRecipeSerializer().createObjectNode();
-        }
-
+        // tell user about all schema errors in one message
+        boolean shouldError = false;
+        StringBuilder errorBuilder =
+                new StringBuilder("Template recipe provided schema different from template transformer binary:");
         // check both ways
-        for (Iterator<String> it = templateSchema.fieldNames(); it.hasNext(); ) {
-            String field = it.next();
-            if (!defaultNode.has(field)
-                    && !templateSchema.get(field).get(TEMPLATE_FIELD_REQUIRED_KEY).asBoolean()) {
-                throw new MissingTemplateParameterException("Template does not provide default for optional "
-                        + "parameter: " + field);
-            }
-            if (templateSchema.get(field).get(TEMPLATE_FIELD_REQUIRED_KEY).asBoolean()) {
-                ((ObjectNode)defaultNode).remove(field);
+        for (Map.Entry<String, TemplateParameter> e : templateSchema.entrySet()) {
+            if (recipeProvidedSchema.get(e.getKey()) == null) {
+                shouldError = true;
+                errorBuilder.append("\nMissing parameter: ").append(e.getKey());
                 continue;
             }
-            JsonNode defaultVal = defaultNode.get(field);
-            if (nodeType(templateSchema.get(field).get(TEMPLATE_FIELD_TYPE_KEY).asText()) != defaultVal.getNodeType()) {
-                throw new TemplateParameterTypeMismatchException("Template default for '" + field
-                        + "' does not match schema. Expected "
-                        + nodeType(templateSchema.get(field).get(TEMPLATE_FIELD_TYPE_KEY).asText())
-                        + " but got " + defaultNode.getNodeType());
+            TemplateParameter recipeProvidedParam = recipeProvidedSchema.get(e.getKey());
+            if (!e.getValue().equals(recipeProvidedParam)) {
+                shouldError = true;
+                errorBuilder.append("\nTemplate value for \"").append(e.getKey())
+                        .append("\" does not match schema. Expected ").append(e.getValue()).append(" but got ")
+                        .append(recipeProvidedParam);
             }
         }
-        for (Iterator<String> it = defaultNode.fieldNames(); it.hasNext(); ) {
-            String field = it.next();
-            if (!templateSchema.has(field)) {
-                throw new IllegalTemplateParameterException("Template declared parameter not found in schema: "
-                        + field);
+        for (String key : recipeProvidedSchema.keySet()) {
+            if (!templateSchema.containsKey(key)) {
+                shouldError = true;
+                errorBuilder.append("\nTemplate declared parameter not found in schema: ").append(key);
             }
         }
 
-        return defaultNode;
+        if (shouldError) {
+            throw new TemplateParameterException(errorBuilder.toString());
+        }
     }
 
     // merges the template-provided default parameters and parameters provided by the parameter file. validates the
     // resulting parameter set satisfies the schema declared by the template.
     // returns the resulting parameter set.
-    protected JsonNode mergeAndValidateComponentParams(ComponentRecipe paramFile)
+    protected Object mergeAndValidateComponentParams(ComponentRecipe paramFile)
             throws RecipeTransformerException {
-        ComponentConfiguration componentConfiguration = paramFile.getComponentConfiguration();
-        JsonNode paramNode = getRecipeSerializer().createObjectNode();
-        if (componentConfiguration != null && componentConfiguration.getDefaultConfiguration() != null) {
-            paramNode = componentConfiguration.getDefaultConfiguration();
+        Map<String, Object> params = paramFile.getTemplateParameters();
+        if (params == null) {
+            params = new HashMap<>();
         }
-        JsonNode mergedParams = mergeParams(effectiveDefaultConfig, paramNode);
+        Map<String, Object> mergedParams = mergeParams(templateSchema, params);
         try {
             validateParams(mergedParams);
         } catch (TemplateParameterException e) {
-            throw new RecipeTransformerException("Configuration does not match required schema", e);
+            throw new RecipeTransformerException("Configuration for component " + paramFile.getComponentName()
+                    + " does not match required schema", e);
         }
-        return mergedParams;
+        try {
+             return getRecipeSerializer().readValue(getRecipeSerializer().writeValueAsString(mergedParams),
+                    templateParametersShape);
+        } catch (JsonProcessingException e) {
+            throw new RecipeTransformerException(e);
+        }
     }
 
 
     /* Utility functions */
 
     // checks the provided parameter map satisfies the schema
-    @SuppressWarnings("PMD.ForLoopCanBeForeach")
-    void validateParams(JsonNode params) throws TemplateParameterException {
-        // check both ways
-        for (Iterator<String> it = templateSchema.fieldNames(); it.hasNext(); ) {
-            String field = it.next();
-            if (!params.has(field)) { // we validate template defaults, so this can only happen if a required param
-                // is not given
-                throw new MissingTemplateParameterException("Configuration does not specify required parameter: "
-                        + field);
+    void validateParams(Map<String, Object> params) throws TemplateParameterException {
+        boolean shouldError = false;
+        StringBuilder errorBuilder = new StringBuilder("Provided parameters do not satisfy template schema:");
+        for (Map.Entry<String, TemplateParameter> e : templateSchema.entrySet()) {
+            if (!params.containsKey(e.getKey())) { // we validate template defaults, so this can only happen if a
+                // required param is not given
+                shouldError = true;
+                errorBuilder.append("\nConfiguration does not specify required parameter: ").append(e.getKey());
+                continue;
             }
-            JsonNodeType paramType = params.get(field).getNodeType();
-            if (nodeType(templateSchema.get(field).get(TEMPLATE_FIELD_TYPE_KEY).asText()) != paramType) {
-                throw new TemplateParameterTypeMismatchException("Provided parameter " + field
-                        + " does not satisfy template schema. Expected "
-                        + nodeType(templateSchema.get(field).get(TEMPLATE_FIELD_TYPE_KEY).asText())
-                        + " but got " + paramType);
+            TemplateParameterType actualType = extractType(params.get(e.getKey()));
+            if (!e.getValue().getType().equals(actualType)) {
+                shouldError = true;
+                errorBuilder.append("\nProvided parameter \"").append(e.getKey())
+                        .append("\" does not specify required schema. Expected ").append(e.getValue().getType())
+                        .append(" but got ").append(actualType);
             }
         }
-        for (Iterator<String> it = params.fieldNames(); it.hasNext(); ) {
-            String field = it.next();
-            if (!templateSchema.has(field)) {
-                throw new IllegalTemplateParameterException("Configuration declared parameter not found in schema: "
-                        + field);
+        for (String key : params.keySet()) {
+            if (!templateSchema.containsKey(key)) {
+                shouldError = true;
+                errorBuilder.append("\nConfiguration declared parameter not found in schema: ").append(key);
             }
+        }
+
+        if (shouldError) {
+            throw new TemplateParameterException(errorBuilder.toString());
         }
     }
 
     // merge the defaultVal parameter map into the customVal parameter map by set addition. if both declare a value
     // for the same parameter, the one in customVal takes precedence.
-    static JsonNode mergeParams(JsonNode defaultVal, @Nullable JsonNode customVal) {
-        if (customVal == null) {
-            return defaultVal;
-        }
-
-        JsonNode retval = customVal.deepCopy();
-        Iterator<String> fieldNames = defaultVal.fieldNames();
-        while (fieldNames.hasNext()) {
-            String fieldName = fieldNames.next();
-            if (customVal.has(fieldName)) { // TODO: how do we resolve field capitalization???
-                ((ObjectNode)retval).set(fieldName, customVal.get(fieldName)); // non-recursive
-            } else {
-                ((ObjectNode)retval).set(fieldName, defaultVal.get(fieldName));
+    static Map<String, Object> mergeParams(TemplateParameterSchema defaultVal, Map<String, Object> customVal) {
+        Map<String, Object> retval = new HashMap<>(customVal);
+        for (Map.Entry<String, TemplateParameter> e : defaultVal.entrySet()) {
+            if (!retval.containsKey(e.getKey())) {
+                retval.put(e.getKey(), e.getValue().getDefaultValue());
             }
         }
         return retval;
     }
 
-    // Utility to get the node type from a string. Useful when parsing type from JSON.
-    protected static JsonNodeType nodeType(String typeString) {
-        String lowercased = typeString.toLowerCase();
-        switch (lowercased) {
-            case STRING_TYPE: return JsonNodeType.STRING;
-            case NUMBER_TYPE: return JsonNodeType.NUMBER;
-            case OBJECT_TYPE: return JsonNodeType.OBJECT;
-            case ARRAY_TYPE: return JsonNodeType.ARRAY;
-            case BOOLEAN_TYPE: return JsonNodeType.BOOLEAN;
-            case NULL_TYPE: return JsonNodeType.NULL;
-            default: return JsonNodeType.MISSING;
+    // Utility to get the JSON node type from an object. Returns null if the object is not a known type.
+    @Nullable
+    protected static TemplateParameterType extractType(Object object) {
+        try {
+            switch (getRecipeSerializer().readTree(getRecipeSerializer().writeValueAsString(object)).getNodeType()) {
+                case STRING:
+                    return TemplateParameterType.STRING;
+                case NUMBER:
+                    return TemplateParameterType.NUMBER;
+                case OBJECT:
+                    return TemplateParameterType.OBJECT;
+                case ARRAY:
+                    return TemplateParameterType.ARRAY;
+                case BOOLEAN:
+                    return TemplateParameterType.BOOLEAN;
+                default:
+                    return null;
+            }
+        } catch (JsonProcessingException e) {
+            return null;
         }
     }
 }
