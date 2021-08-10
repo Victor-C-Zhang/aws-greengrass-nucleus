@@ -329,7 +329,7 @@ public class TemplateEngineIntegTest extends BaseITCase {
         try (Stream<Path> files = Files.walk(artifactsDir)) {
             for (Path r : files.collect(Collectors.toList())) {
                 if (!r.toFile().isDirectory() && "transformer-tests.jar".equals(r.getFileName().toString())) {
-                    Files.move(r, r.resolveSibling("transformer.jar"));
+                    Files.move(r, r.resolveSibling("transformer.jar"), REPLACE_EXISTING);
                 }
             }
         }
