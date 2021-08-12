@@ -158,10 +158,11 @@ public class TemplateEngine {
             ComponentIdentifier templateId =
                     mapOfTemplateNameToTemplateIdentifier.get(dependencyEntry.getKey());
             if (templateId == null) {
-                if (dependencyEntry.getKey().endsWith("Template")) {
-                    throw new IllegalTemplateDependencyException("Component " + identifier.getName() + " depends on a "
-                            + "version of " + dependencyEntry.getKey() + " that can't be found locally. Requirement is "
-                            + dependencyEntry.getValue().getVersionRequirement());
+                if (dependencyEntry.getKey().endsWith("Template")) { // TODO: remove local assumption (and this code)
+                    throw new IllegalTemplateDependencyException(
+                            String.format("Component %s depends on a version of %s that can't be found locally. "
+                                    + "Requirement is %s.", identifier.getName(), dependencyEntry.getKey(),
+                                    dependencyEntry.getValue().getVersionRequirement()));
                 }
                 continue;
             }

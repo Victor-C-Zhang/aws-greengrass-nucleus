@@ -31,7 +31,7 @@ public abstract class PlatformTestUtils {
             INSTANCE = new UnixPlatformTestUtils();
         }
 
-        logger.atTrace().log("Getting platform test com.aws.greengrass.lambdatransformer.common.utils instance {}", INSTANCE.getClass().getName());
+        logger.atTrace().log("Getting platform test utils instance {}", INSTANCE.getClass().getName());
         return INSTANCE;
     }
 
