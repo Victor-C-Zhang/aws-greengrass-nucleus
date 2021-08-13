@@ -2,6 +2,7 @@
 recipeFormatVersion: '2020-01-25'
 componentName: ThirdTemplate
 componentVersion: '1.0.0'
+componentType: aws.greengrass.template
 componentDescription: Template for testing
 Manifests:
   - Platform:

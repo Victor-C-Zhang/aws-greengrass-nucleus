@@ -2,18 +2,16 @@
 recipeFormatVersion: 2020-01-25
 componentName: LoggerTemplate
 componentVersion: '1.0.0'
-componentConfiguration:
-  defaultConfiguration:
-    parameters:
-      timestamp: false
-      message: Ping pong its a default message
-    parameterSchema:
-      intervalInSecs:
-        type: number
-        required: true
-      timestamp:
-        type: boolean
-        required: false
-      message:
-        type: string
-        required: false
+componentType: aws.greengrass.template
+templateParameterSchema:
+  intervalInSecs:
+    type: number
+    required: true
+  timestamp:
+    type: boolean
+    required: false
+    defaultValue: false
+  message:
+    type: string
+    required: false
+    defaultValue: Ping pong its a default message

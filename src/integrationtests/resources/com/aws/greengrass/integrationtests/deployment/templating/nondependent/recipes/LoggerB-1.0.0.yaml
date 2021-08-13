@@ -6,7 +6,6 @@ componentVersion: '1.0.0'
 componentDependencies:
   LoggerTemplate:
     versionRequirement: '1.0.0'
-ComponentConfiguration:
-  DefaultConfiguration:
-    intervalInSecs: 3
-    timestamp: true
+templateParameters:
+  intervalInSecs: 3
+  timestamp: true

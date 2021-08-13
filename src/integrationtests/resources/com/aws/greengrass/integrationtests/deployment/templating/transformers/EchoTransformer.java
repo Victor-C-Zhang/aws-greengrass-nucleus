@@ -11,9 +11,9 @@ import com.amazon.aws.iot.greengrass.component.common.Platform;
 import com.amazon.aws.iot.greengrass.component.common.PlatformSpecificManifest;
 import com.amazon.aws.iot.greengrass.component.common.RecipeFormatVersion;
 import com.aws.greengrass.deployment.templating.RecipeTransformer;
-import com.aws.greengrass.deployment.templating.exceptions.TemplateParameterException;
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.JsonNode;
+import lombok.AllArgsConstructor;
+import lombok.Data;
+import lombok.NoArgsConstructor;
 
 import java.util.Collections;
 import java.util.HashMap;
@@ -41,12 +41,18 @@ public class EchoTransformer extends RecipeTransformer {
         return TEMPLATE_SCHEMA;
     }
 
+    @Override
+    protected Class<?> initRecievingClass() {
+        return ParamsObject.class;
+    }
+
     // generate a component recipe from a list of well-behaved parameters
     @Override
-    public ComponentRecipe transform(ComponentRecipe paramFile, JsonNode componentConfig) {
+    public ComponentRecipe transform(ComponentRecipe paramFile, Object componentConfigObj) {
+        ParamsObject componentConfig = (ParamsObject) componentConfigObj;
         Map<String, Object> newLifecyle = new HashMap<>();
         String runString = String.format("echo Param1: %s Param2: %s",
-                componentConfig.get("param1").asText(), componentConfig.get("param2").asText());
+                componentConfig.getParam1(), componentConfig.getParam2());
         newLifecyle.put("run", runString);
 
         PlatformSpecificManifest manifest =
@@ -62,5 +68,13 @@ public class EchoTransformer extends RecipeTransformer {
                 .componentType(ComponentType.GENERIC)
                 .manifests(Collections.singletonList(manifest))
                 .build();
+    }
+
+    @Data
+    @NoArgsConstructor
+    @AllArgsConstructor
+    private static class ParamsObject {
+        String param1;
+        String param2;
     }
 }

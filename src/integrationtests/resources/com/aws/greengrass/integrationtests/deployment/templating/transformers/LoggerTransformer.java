@@ -12,15 +12,13 @@ import com.amazon.aws.iot.greengrass.component.common.PlatformSpecificManifest;
 import com.amazon.aws.iot.greengrass.component.common.RecipeFormatVersion;
 import com.aws.greengrass.deployment.templating.RecipeTransformer;
 import com.aws.greengrass.deployment.templating.exceptions.RecipeTransformerException;
-import com.aws.greengrass.deployment.templating.exceptions.TemplateParameterException;
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.JsonNode;
+import lombok.AllArgsConstructor;
+import lombok.Data;
+import lombok.NoArgsConstructor;
 
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
-
-import static com.amazon.aws.iot.greengrass.component.common.SerializerFactory.getRecipeSerializer;
 
 public class LoggerTransformer extends RecipeTransformer {
 
@@ -31,13 +29,15 @@ public class LoggerTransformer extends RecipeTransformer {
       timestamp:
         type: boolean
         required: false
+        defaultValue: false
       message:
         type: string
         required: false
+        defaultValue: Ping pong its a default message
      */
     private static final String PARAMETER_SCHEMA = "intervalInSecs:\n" + "  type: number\n" + "  required: true\n"
-            + "timestamp:\n" + "  type: boolean\n" + "  required: false\n" + "message:\n" + "  type: string\n"
-            + "  required: false";
+            + "timestamp:\n" + "  type: boolean\n" + "  required: false\n" + "  defaultValue: false\n" + "message:\n"
+            + "  type: string\n" + "  required: false\n" + "  defaultValue: Ping pong its a default message";
 
     @Override
     protected String initTemplateSchema() {
@@ -45,15 +45,21 @@ public class LoggerTransformer extends RecipeTransformer {
     }
 
     @Override
-    public ComponentRecipe transform(ComponentRecipe paramFile, JsonNode componentParams)
-            throws RecipeTransformerException {
-        String getTimestampString = componentParams.get("timestamp").asBoolean() ? " ; echo `date`" : "";
-        String getTimestampStringWindows = componentParams.get("timestamp").asBoolean() ? " && echo %DATE% %TIME%" : "";
+    protected Class<?> initRecievingClass() {
+        return TransformerParams.class;
+    }
 
-        String runScript = String.format("sleep %d && echo %s", componentParams.get("intervalInSecs").asInt(),
-                componentParams.get("message").asText())
+    @Override
+    public ComponentRecipe transform(ComponentRecipe paramFile, Object componentParamsObj)
+            throws RecipeTransformerException {
+        TransformerParams componentParams = (TransformerParams) componentParamsObj;
+        String getTimestampString = componentParams.getTimestamp() ? " ; echo `date`" : "";
+        String getTimestampStringWindows = componentParams.getTimestamp() ? " && echo %DATE% %TIME%" : "";
+
+        String runScript = String.format("sleep %d && echo %s", componentParams.getIntervalInSecs(),
+                componentParams.getMessage())
                 + getTimestampString;
-        String runScriptWindows = String.format("echo %s", componentParams.get("message").asText())
+        String runScriptWindows = String.format("echo %s", componentParams.getMessage())
                 + getTimestampStringWindows;
 
         Map<String, Object> lifecycle = new HashMap<>();
@@ -78,5 +84,14 @@ public class LoggerTransformer extends RecipeTransformer {
                 .componentType(ComponentType.GENERIC)
                 .manifests(Arrays.asList(manifestWindows, manifest))
                 .build();
+    }
+
+    @Data
+    @NoArgsConstructor
+    @AllArgsConstructor
+    private static class TransformerParams {
+        Integer intervalInSecs;
+        Boolean timestamp;
+        String message;
     }
 }

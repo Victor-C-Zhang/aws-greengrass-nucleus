@@ -6,7 +6,6 @@ componentVersion: '1.0.0'
 componentDependencies:
   ATemplate:
     versionRequirement: '1.0.0'
-ComponentConfiguration:
-  DefaultConfiguration:
-    param1: hello
-    param2: world
+templateParameters:
+  param1: hello
+  param2: world
