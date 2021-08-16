@@ -121,9 +121,11 @@ public class TemplateEngine {
     void scanComponentsIntoEngine(Path recipeDirectoryPath) throws IOException {
         try (Stream<Path> files = Files.walk(recipeDirectoryPath)) {
             for (Path r : files.collect(Collectors.toList())) {
-                System.out.println(r.getFileName().toString());
-                if (!r.toFile().isDirectory() && !r.getFileName().toString().endsWith(METADATA_JSON_EXT)) {
-                    scanComponentIntoEngine(r);
+                if (!r.toFile().isDirectory()) {
+                    Path file = r.getFileName();
+                    if (file != null && !file.toString().endsWith(METADATA_JSON_EXT)) {
+                        scanComponentIntoEngine(r);
+                    }
                 }
             }
         }
