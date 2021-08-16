@@ -40,6 +40,7 @@ import static com.aws.greengrass.deployment.DeploymentService.parseFile;
  */
 public class TemplateEngine {
     public static final String PARSER_JAR = "transformer.jar";
+    public static final String METADATA_JSON_EXT = ".metadata.json";
 
     private final ComponentStore componentStore;
     private final NucleusPaths nucleusPaths;
@@ -120,7 +121,8 @@ public class TemplateEngine {
     void scanComponentsIntoEngine(Path recipeDirectoryPath) throws IOException {
         try (Stream<Path> files = Files.walk(recipeDirectoryPath)) {
             for (Path r : files.collect(Collectors.toList())) {
-                if (!r.toFile().isDirectory()) {
+                System.out.println(r.getFileName().toString());
+                if (!r.toFile().isDirectory() && !r.getFileName().toString().endsWith(METADATA_JSON_EXT)) {
                     scanComponentIntoEngine(r);
                 }
             }
@@ -134,6 +136,7 @@ public class TemplateEngine {
                 recipe.getComponentVersion());
         mapOfComponentIdentifierToRecipe.put(identifier, recipe);
         if (recipe.getComponentType().equals(ComponentType.TEMPLATE)) {
+            // will implicitly keep the latest version only
             mapOfTemplateNameToTemplateIdentifier.put(recipe.getComponentName(), identifier);
         }
     }
