@@ -8,6 +8,7 @@ package com.aws.greengrass.deployment.templating;
 import com.amazon.aws.iot.greengrass.component.common.ComponentRecipe;
 import com.amazon.aws.iot.greengrass.component.common.ComponentType;
 import com.amazon.aws.iot.greengrass.component.common.DependencyProperties;
+import com.amazon.aws.iot.greengrass.component.common.DependencyType;
 import com.amazon.aws.iot.greengrass.component.common.PlatformSpecificManifest;
 import com.aws.greengrass.componentmanager.ComponentStore;
 import com.aws.greengrass.componentmanager.exceptions.PackageLoadingException;
@@ -247,7 +248,42 @@ public class TemplateEngine {
          wrapper = new TransformerWrapper(templateJarFile, mapOfComponentIdentifierToRecipe.get(template), context);
         for (ComponentIdentifier paramFile : paramFiles) {
             ComponentRecipe expandedRecipe = wrapper.expandOne(mapOfComponentIdentifierToRecipe.get(paramFile));
+            expandedRecipe = injectTemplateDependencyIfNeeded(expandedRecipe, template);
             componentStore.savePackageRecipe(paramFile, getRecipeSerializer().writeValueAsString(expandedRecipe));
         }
+    }
+
+    // function that ensures the (component) recipe depends on the template. this is to prevent the template
+    // component from being removed from component store if we deploy from cloud
+    ComponentRecipe injectTemplateDependencyIfNeeded(ComponentRecipe recipe, ComponentIdentifier templateIdentifier) {
+        Map<String, DependencyProperties> dependencyMap = recipe.getComponentDependencies();
+        if (dependencyMap != null) {
+            dependencyMap.putIfAbsent(templateIdentifier.getName(),
+                    DependencyProperties.builder()
+                            .versionRequirement(templateIdentifier.getVersion().toString())
+                            .dependencyType(DependencyType.SOFT)
+                            .build());
+            return recipe;
+        }
+        dependencyMap = new HashMap<>();
+        dependencyMap.put(templateIdentifier.getName(),
+                DependencyProperties.builder()
+                        .versionRequirement(templateIdentifier.getVersion().toString())
+                        .dependencyType(DependencyType.SOFT)
+                        .build());
+        // since recipe is immutable, we need to create a new one
+        return ComponentRecipe.builder()
+                .recipeFormatVersion(recipe.getRecipeFormatVersion())
+                .componentName(recipe.getComponentName())
+                .componentVersion(recipe.getComponentVersion())
+                .componentType(recipe.getComponentType())
+                .componentDescription(recipe.getComponentDescription())
+                .componentPublisher(recipe.getComponentPublisher())
+                .componentSource(recipe.getComponentSource())
+                .componentConfiguration(recipe.getComponentConfiguration())
+                .manifests(recipe.getManifests())
+                .lifecycle(recipe.getLifecycle())
+                .componentDependencies(dependencyMap)
+                .build();
     }
 }

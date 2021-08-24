@@ -15,3 +15,10 @@ templateParameterSchema:
     type: string
     required: false
     defaultValue: Ping pong its a default message
+manifests:
+  - platform:
+      os: '*'
+    lifecycle: {}
+    artifacts:
+      - uri: "greengrass:transformer.jar"
+        unarchive: NONE
