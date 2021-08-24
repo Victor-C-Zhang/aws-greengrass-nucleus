@@ -4,3 +4,10 @@ componentName: ADependentTemplate
 componentVersion: '1.0.0'
 componentType: aws.greengrass.template
 templateParameterSchema: {}
+manifests:
+  - platform:
+      os: '*'
+    lifecycle: {}
+    artifacts:
+      - uri: "greengrass:transformer.jar"
+        unarchive: NONE

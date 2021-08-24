@@ -6,6 +6,7 @@
 package com.aws.greengrass.integrationtests.deployment.templating;
 
 import com.amazon.aws.iot.greengrass.component.common.ComponentRecipe;
+import com.amazon.aws.iot.greengrass.component.common.Platform;
 import com.aws.greengrass.componentmanager.exceptions.PackageDownloadException;
 import com.aws.greengrass.dependency.State;
 import com.aws.greengrass.deployment.DeploymentDocumentDownloader;
@@ -280,8 +281,14 @@ public class TemplateEngineIntegTest extends BaseITCase {
                                     recipe.getManifests().get(0).getLifecycle().get("run"));
                             break;
                         }
+                        case "ATemplate":
+                        case "LoggerTemplate": {
+                            assertEquals(0, recipe.getManifests().get(0).getLifecycle().size());
+                            assertEquals(Platform.OS.ALL, recipe.getManifests().get(0).getPlatform().getOs());
+                            break;
+                        }
                         default: {
-                            fail("Found recipe file other than loggers A,B,C");
+                            fail("Found recipe file other than loggers A,B,C, LoggerTemplate, and ATemplate");
                             break;
                         }
                     }
@@ -308,8 +315,15 @@ public class TemplateEngineIntegTest extends BaseITCase {
                                     recipe.getManifests().get(0).getLifecycle().get("run"));
                             break;
                         }
+                        case "ADependentTemplate":
+                        case "BDependentTemplate": {
+                            assertEquals(0, recipe.getManifests().get(0).getLifecycle().size());
+                            assertEquals(Platform.OS.ALL, recipe.getManifests().get(0).getPlatform().getOs());
+                            break;
+                        }
                         default: {
-                            fail("Found recipe file other than ADependent, BDependent");
+                            fail("Found recipe file other than ADependent, BDependent, ADependentTemplate, "
+                                    + "BDependentTemplate");
                             break;
                         }
                     }

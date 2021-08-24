@@ -11,3 +11,10 @@ templateParameterSchema:
   param2:
     type: string
     required: true
+manifests:
+  - platform:
+      os: '*'
+    lifecycle: {}
+    artifacts:
+      - uri: "greengrass:transformer.jar"
+        unarchive: NONE
